@@ -1,0 +1,245 @@
+{{define "layout"}}<!doctype html>
+<html lang="en" data-theme="{{.Theme}}" data-font="{{.FontScale}}"{{if .ReducedMotion}} data-motion="reduce"{{end}}>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} · GopherSocial Learn</title>
+  <meta name="description" content="{{.Description}}">
+  <meta name="color-scheme" content="light dark">
+  <meta name="csrf-token" content="{{.CSRF}}">
+  <link rel="stylesheet" href="{{asset "app.css"}}">
+  <link rel="icon" href="{{asset "mark.svg"}}" type="image/svg+xml">
+  <script src="{{asset "learn.js"}}" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  {{template "symbols" .}}
+
+  <div class="shell">
+    <aside class="rail" id="rail" aria-label="Learning navigation">
+      <div class="rail-head">
+        <a class="brand" href="/learn">
+          <span class="brand-mark" aria-hidden="true">{{template "icon-mark" .}}</span>
+          <span class="brand-text"><strong>GopherSocial</strong><span>Learn</span></span>
+        </a>
+        <button class="icon-button rail-close" type="button" data-rail-close aria-label="Close navigation">
+          <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+
+      <form class="rail-search" action="/learn/search" method="get" role="search">
+        <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+        <label class="visually-hidden" for="rail-q">Search the curriculum</label>
+        <input id="rail-q" type="search" name="q" placeholder="Search lessons" autocomplete="off" data-search-input>
+        <kbd aria-hidden="true">/</kbd>
+      </form>
+
+      <nav class="rail-nav" aria-label="Primary">
+        <a href="/learn"{{if eq .Path "/learn"}} class="is-current" aria-current="page"{{end}}>
+          <svg class="icon" aria-hidden="true"><use href="#i-home"></use></svg>Overview</a>
+        <a href="/learn/courses"{{if hasPrefix .Path "/learn/courses"}} class="is-current" aria-current="page"{{end}}>
+          <svg class="icon" aria-hidden="true"><use href="#i-book"></use></svg>Courses</a>
+        <a href="/learn/exercises"{{if hasPrefix .Path "/learn/exercises"}} class="is-current" aria-current="page"{{end}}>
+          <svg class="icon" aria-hidden="true"><use href="#i-code"></use></svg>Exercises</a>
+        <a href="/learn/glossary"{{if hasPrefix .Path "/learn/glossary"}} class="is-current" aria-current="page"{{end}}>
+          <svg class="icon" aria-hidden="true"><use href="#i-abc"></use></svg>Glossary</a>
+        <a href="/learn/search"{{if hasPrefix .Path "/learn/search"}} class="is-current" aria-current="page"{{end}}>
+          <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>Search</a>
+        <a href="/learn/api"{{if hasPrefix .Path "/learn/api"}} class="is-current" aria-current="page"{{end}}>
+          <svg class="icon" aria-hidden="true"><use href="#i-braces"></use></svg>API reference</a>
+        <a href="/learn/playground"{{if hasPrefix .Path "/learn/playground"}} class="is-current" aria-current="page"{{end}}>
+          <svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg>Playground</a>
+      </nav>
+
+      <div class="rail-section">
+        <p class="rail-label">Your work</p>
+        <nav class="rail-nav rail-nav-tight" aria-label="Your work">
+          <a href="/learn/progress"{{if hasPrefix .Path "/learn/progress"}} class="is-current" aria-current="page"{{end}}>
+            <svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg>Progress</a>
+          <a href="/learn/review"{{if hasPrefix .Path "/learn/review"}} class="is-current" aria-current="page"{{end}}>
+            <svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>Review</a>
+          <a href="/learn/bookmarks"{{if hasPrefix .Path "/learn/bookmarks"}} class="is-current" aria-current="page"{{end}}>
+            <svg class="icon" aria-hidden="true"><use href="#i-bookmark"></use></svg>Bookmarks</a>
+        </nav>
+      </div>
+
+      {{if .Profile}}
+      <div class="rail-meter" aria-label="Curriculum progress">
+        <div class="ring" style="--p:{{.Summary.Percent}}" aria-hidden="true">
+          <span>{{.Summary.Percent}}%</span>
+        </div>
+        <div>
+          <strong>{{.Summary.Completed}} of {{.Summary.TotalLessons}}</strong>
+          <span>lessons complete</span>
+        </div>
+      </div>
+      {{end}}
+
+      <div class="rail-section rail-curriculum">
+        <p class="rail-label">Curriculum</p>
+        {{range .Nav}}
+        <details class="nav-course"{{if eq .Slug $.ActiveCourse}} open{{end}}>
+          <summary>
+            <span>{{.Title}}</span>
+            {{if .New}}<span class="tag">New</span>{{end}}
+          </summary>
+          <div class="nav-course-body">
+            {{$course := .}}
+            {{range .Modules}}
+            <div class="nav-module">
+              <p class="nav-module-title">{{.Title}}</p>
+              <ul class="nav-lessons">
+                {{range .Docs}}
+                <li>
+                  <a href="{{lessonURL .Slug}}"{{if eq .Slug $.ActiveSlug}} class="is-current" aria-current="page"{{end}}>
+                    <span class="nav-num">{{.Number}}</span>
+                    <span>{{.Title}}</span>
+                  </a>
+                </li>
+                {{end}}
+              </ul>
+            </div>
+            {{end}}
+          </div>
+        </details>
+        {{end}}
+      </div>
+
+      <div class="rail-foot">
+        <details class="settings">
+          <summary>
+            <svg class="icon" aria-hidden="true"><use href="#i-sliders"></use></svg>
+            Reading settings
+          </summary>
+          <form class="settings-form" method="post" action="/learn/preferences" data-settings-form>
+            <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+            <input type="hidden" name="next" value="{{.Path}}">
+            <label>
+              <span>Theme</span>
+              <select name="theme">
+                <option value="auto"{{if eq .Theme "auto"}} selected{{end}}>Match system</option>
+                <option value="light"{{if eq .Theme "light"}} selected{{end}}>Light</option>
+                <option value="dark"{{if eq .Theme "dark"}} selected{{end}}>Dark</option>
+              </select>
+            </label>
+            <label>
+              <span>Text size</span>
+              <select name="font_scale">
+                <option value="compact"{{if eq .FontScale "compact"}} selected{{end}}>Compact</option>
+                <option value="normal"{{if eq .FontScale "normal"}} selected{{end}}>Normal</option>
+                <option value="large"{{if eq .FontScale "large"}} selected{{end}}>Large</option>
+              </select>
+            </label>
+            <label class="check">
+              <input type="checkbox" name="reduced_motion" value="true"{{if .ReducedMotion}} checked{{end}}>
+              <span>Reduce motion</span>
+            </label>
+            <button class="button button-small" type="submit">Save settings</button>
+            <p class="settings-status" data-settings-status role="status"></p>
+          </form>
+        </details>
+
+        {{if .Profile}}
+        <div class="who">
+          <span class="avatar" aria-hidden="true">{{initials .Profile.DisplayName}}</span>
+          <div class="who-text">
+            <strong>{{.Profile.DisplayName}}</strong>
+            {{if .Profile.Guest}}<span class="tag">Guest</span>{{else}}<span>{{.Profile.Username}}</span>{{end}}
+          </div>
+        </div>
+        {{if .Profile.Guest}}
+        <a class="button button-small button-quiet" href="/learn/login?next={{.Path}}">Sign in to keep progress</a>
+        {{else}}
+        <form method="post" action="/learn/logout">
+          <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+          <button class="button button-small button-quiet" type="submit">Sign out</button>
+        </form>
+        {{end}}
+        {{else}}
+        <div class="rail-auth">
+          <a class="button button-small" href="/learn/login?next={{.Path}}">Sign in</a>
+          <form method="post" action="/learn/session/guest">
+            <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+            <input type="hidden" name="next" value="{{.Path}}">
+            <button class="button button-small button-quiet" type="submit">Start as guest</button>
+          </form>
+        </div>
+        {{end}}
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <button class="icon-button rail-open" type="button" data-rail-open aria-label="Open navigation" aria-controls="rail" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg>
+        </button>
+        <div class="crumbs" aria-label="Breadcrumb">
+          <a href="/learn">Learn</a>
+          {{if .CrumbCourse}}<span aria-hidden="true">/</span><a href="/learn/courses/{{.ActiveCourse}}">{{.CrumbCourse}}</a>{{end}}
+          {{if .CrumbModule}}<span aria-hidden="true">/</span><span>{{.CrumbModule}}</span>{{end}}
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-button" type="button" data-theme-toggle aria-label="Switch theme">
+            <svg class="icon icon-sun" aria-hidden="true"><use href="#i-sun"></use></svg>
+            <svg class="icon icon-moon" aria-hidden="true"><use href="#i-moon"></use></svg>
+          </button>
+        </div>
+      </header>
+
+      {{if .Diagnostics}}
+      <div class="diagnostics" role="status">
+        <strong>{{len .Diagnostics}} content warning{{if ne (len .Diagnostics) 1}}s{{end}}</strong>
+        <span>Some curriculum files could not be loaded. The rest of the site is unaffected.</span>
+        <details>
+          <summary>Details</summary>
+          <ul>
+            {{range .Diagnostics}}<li><code>{{.Path}}</code> {{.Message}}</li>{{end}}
+          </ul>
+        </details>
+      </div>
+      {{end}}
+
+      <main id="main" class="page">
+        {{template "content" .}}
+      </main>
+
+      <footer class="site-foot">
+        <p>Built on the GopherSocial API. <a href="https://github.com/haqi/gophersocial">Read the source</a>.</p>
+        <p class="foot-meta">Content version {{contentVersion}}</p>
+      </footer>
+    </div>
+  </div>
+
+  <div class="rail-scrim" data-rail-close hidden></div>
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>{{end}}
+
+{{define "symbols"}}
+<svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h9a4 4 0 0 1 4 4v12H8a3 3 0 0 1-3-3Z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 4v16M12 8h3" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m9 7-5 5 5 5m6-10 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-abc" viewBox="0 0 24 24"><path d="M3 18 7 6l4 12M4.5 14h5M14 8h4a2 2 0 0 1 0 4h-1v4h1a2 2 0 0 0 0-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m15.5 15.5 4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-braces" viewBox="0 0 24 24"><path d="M9 4c-2 0-3 1-3 3v2c0 1.5-1 2-2 2 1 0 2 .5 2 2v3c0 2 1 3 3 3M15 4c2 0 3 1 3 3v2c0 1.5 1 2 2 2-1 0-2 .5-2 2v3c0 2-1 3-3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10m6 10V4m6 16v-7m4 7H2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6.3M20 5v6h-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v4.5l3 1.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 20a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+</svg>
+{{end}}
+
+{{define "icon-mark"}}<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="3" y="7" width="34" height="26" rx="7" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="14" cy="18" r="2.2" fill="currentColor"/><circle cx="26" cy="18" r="2.2" fill="currentColor"/><path d="M13 25c2 2 4.6 3 7 3s5-1 7-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>{{end}}

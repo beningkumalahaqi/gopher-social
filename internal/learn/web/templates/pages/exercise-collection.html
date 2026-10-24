@@ -1,0 +1,26 @@
+{{define "content"}}
+<div class="stack">
+  <header class="page-head">
+    <p class="eyebrow">Exercise collection</p>
+    <h1>{{.Data.Title}}</h1>
+    {{if .Data.Summary}}<p class="lede">{{.Data.Summary}}</p>{{end}}
+  </header>
+
+  <div class="lesson-layout">
+    <article class="prose lesson-prose">
+      {{.Data.HTML}}
+    </article>
+
+    {{if .Data.TOC}}
+    <aside class="lesson-rail" aria-label="On this page">
+      <p class="rail-title">On this page</p>
+      <ol class="toc">
+        {{range .Data.TOC}}
+        <li class="toc-depth-{{.Level}}"><a href="#{{.ID}}">{{.Text}}</a></li>
+        {{end}}
+      </ol>
+    </aside>
+    {{end}}
+  </div>
+</div>
+{{end}}

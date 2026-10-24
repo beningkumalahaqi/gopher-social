@@ -1,0 +1,11 @@
+{{define "content"}}
+<div class="error-page">
+  <p class="error-code">{{.Data.Status}}</p>
+  <h1>{{.Data.Title}}</h1>
+  <p class="lede">{{.Data.Message}}</p>
+  <div class="error-actions">
+    <a class="button" href="/learn">Back to the dashboard</a>
+    <a class="button button-quiet" href="/learn/courses">Browse courses</a>
+  </div>
+</div>
+{{end}}

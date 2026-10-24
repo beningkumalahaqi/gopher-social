@@ -1,0 +1,49 @@
+{{define "content"}}
+<div class="stack">
+  <header class="page-head">
+    <p class="eyebrow">Find it again</p>
+    <h1>Search</h1>
+    <p class="lede">Full text across lessons and exercises, plus the glossary. Filters use the same course and module names as the navigation.</p>
+  </header>
+
+  <form class="search-form" action="/learn/search" method="get" role="search" hx-get="/learn/search/results" hx-target="#search-results" hx-trigger="input changed delay:250ms, change">
+    <div class="search-main">
+      <label class="visually-hidden" for="search-q">Search query</label>
+      <input id="search-q" type="search" name="q" value="{{.Data.Query}}" placeholder="Search lessons, exercises, and terms" autocomplete="off" autofocus>
+      <button class="button" type="submit">Search</button>
+    </div>
+    <div class="search-filters">
+      <label>Course
+        <select name="course">
+          <option value="">Any course</option>
+          {{range .Data.Courses}}<option value="{{.Slug}}"{{if eq .Slug $.Data.Filters.Course}} selected{{end}}>{{.Title}}</option>{{end}}
+        </select>
+      </label>
+      <label>Module
+        <select name="module">
+          <option value="">Any module</option>
+          {{range .Data.Modules}}<option value="{{.Slug}}"{{if eq .Slug $.Data.Filters.Module}} selected{{end}}>{{.Title}}</option>{{end}}
+        </select>
+      </label>
+      <label>Kind
+        <select name="kind">
+          <option value="">Everything</option>
+          <option value="lesson"{{if eq .Data.Filters.Kind "lesson"}} selected{{end}}>Lessons</option>
+          <option value="exercise"{{if eq .Data.Filters.Kind "exercise"}} selected{{end}}>Exercises</option>
+          <option value="term"{{if eq .Data.Filters.Kind "term"}} selected{{end}}>Glossary</option>
+        </select>
+      </label>
+      <label>Status
+        <select name="status">
+          <option value="">Any status</option>
+          <option value="not_started"{{if eq .Data.Filters.Status "not_started"}} selected{{end}}>Not started</option>
+          <option value="in_progress"{{if eq .Data.Filters.Status "in_progress"}} selected{{end}}>In progress</option>
+          <option value="completed"{{if eq .Data.Filters.Status "completed"}} selected{{end}}>Completed</option>
+        </select>
+      </label>
+    </div>
+  </form>
+
+  {{template "search-results" .Data}}
+</div>
+{{end}}

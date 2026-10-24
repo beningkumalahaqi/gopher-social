@@ -1,0 +1,106 @@
+{{define "content"}}
+<div class="stack exercise-page">
+  <header class="page-head">
+    <p class="eyebrow"><a href="/learn/exercises">Exercises</a> · {{.Data.Exercise.Difficulty}}</p>
+    <h1>{{.Data.Exercise.Title}}</h1>
+    <p class="lede">{{.Data.Exercise.Summary}}</p>
+    <div class="meta-row">
+      {{with .Data.Lesson}}<a href="{{lessonURL .Slug}}">Lesson {{.Number}}: {{.Title}}</a>{{end}}
+      {{range .Data.Exercise.ReferenceFiles}}
+      <a href="https://github.com/haqi/gophersocial/blob/main/{{.}}" target="_blank" rel="noopener noreferrer"><code>{{.}}</code></a>
+      {{end}}
+    </div>
+  </header>
+
+  <div class="exercise-layout">
+    <div class="exercise-main">
+      {{if .Data.Exercise.Prompt}}<section class="prose"><p>{{.Data.Exercise.Prompt}}</p></section>{{end}}
+      {{if .Data.Exercise.Code}}<pre class="code-block"><code>{{.Data.Exercise.Code}}</code></pre>{{end}}
+      {{if .Data.Exercise.Task}}<section class="plain-card"><h2>The task</h2><p>{{.Data.Exercise.Task}}</p></section>{{end}}
+
+      {{if .Data.Exercise.Acceptance}}
+      <section class="acceptance">
+        <h2>What done looks like</h2>
+        <ul class="check-list">
+          {{range .Data.Exercise.Acceptance}}<li><svg class="icon" aria-hidden="true"><use href="#i-check"></use></svg><span>{{.}}</span></li>{{end}}
+        </ul>
+      </section>
+      {{end}}
+
+      {{if .Data.Exercise.Verification}}<p class="subtle">{{.Data.Exercise.Verification}}</p>{{end}}
+
+      <div id="exercise-result" aria-live="polite"></div>
+
+      {{if .Data.Exercise.Questions}}
+      <section class="quiz-block">
+        <h2>Check your reasoning</h2>
+        <p class="subtle">Answer from the code, not from memory. The result explains each choice.</p>
+        <form class="quiz-form" method="post" action="/learn/exercises/{{.Data.Exercise.Slug}}" hx-post="/learn/exercises/{{.Data.Exercise.Slug}}" hx-target="#exercise-result" hx-swap="outerHTML">
+          <input type="hidden" name="csrf_token" value="{{.Data.CSRF}}">
+          {{range $i, $q := .Data.Exercise.Questions}}
+          <fieldset class="question">
+            <legend><span class="q-index">{{add $i 1}}</span>{{$q.Prompt}}</legend>
+            {{if $q.Code}}<pre class="code-block"><code>{{$q.Code}}</code></pre>{{end}}
+            {{if eq (printf "%s" .Type) "short"}}
+            <label class="visually-hidden" for="q-{{$q.ID}}">Your answer</label>
+            <textarea id="q-{{$q.ID}}" name="q_{{$q.ID}}" rows="4" placeholder="Explain in a sentence or two"></textarea>
+            {{else}}
+            <div class="options">
+              {{range $q.Options}}
+              <label class="option">
+                <input type="{{if eq (printf "%s" $q.Type) "multiple"}}checkbox{{else}}radio{{end}}" name="q_{{$q.ID}}" value="{{.ID}}">
+                <span>{{.Text}}</span>
+              </label>
+              {{end}}
+            </div>
+            {{end}}
+          </fieldset>
+          {{end}}
+          <div class="form-actions">
+            <button class="button" type="submit">Submit answers</button>
+            {{if .Data.Profile}}<span class="subtle">Attempts are saved to your progress.</span>{{else}}<span class="subtle"><a class="text-link" href="/learn/login">Sign in</a> to save attempts.</span>{{end}}
+          </div>
+        </form>
+      </section>
+      {{end}}
+    </div>
+
+    <aside class="exercise-aside">
+      {{if .Data.Exercise.Objectives}}
+      <section class="aside-card">
+        <p class="aside-label">Objectives</p>
+        <ul class="plain-list small">
+          {{range .Data.Exercise.Objectives}}<li>{{.}}</li>{{end}}
+        </ul>
+      </section>
+      {{end}}
+      {{if .Data.Exercise.Prerequisites}}
+      <section class="aside-card">
+        <p class="aside-label">Before you start</p>
+        <ul class="plain-list small">
+          {{range .Data.Exercise.Prerequisites}}<li>{{.}}</li>{{end}}
+        </ul>
+      </section>
+      {{end}}
+      {{if .Data.Exercise.Hints}}
+      <section class="aside-card">
+        <p class="aside-label">Hints</p>
+        {{range $i, $hint := .Data.Exercise.Hints}}
+        <details class="hint"><summary>Hint {{add $i 1}}</summary><p>{{$hint}}</p></details>
+        {{end}}
+      </section>
+      {{end}}
+      {{if .Data.Attempts}}
+      <section class="aside-card">
+        <p class="aside-label">Your attempts</p>
+        <ul class="attempt-list">
+          {{range .Data.Attempts}}
+          <li><span>{{.Score}}/{{.Total}}</span><span class="subtle">{{timeAgo .CreatedAt}}</span></li>
+          {{end}}
+        </ul>
+      </section>
+      {{end}}
+    </aside>
+  </div>
+</div>
+{{end}}

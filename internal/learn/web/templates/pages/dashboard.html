@@ -1,0 +1,159 @@
+{{define "content"}}
+<div class="stack">
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">A curriculum on a real Go service</p>
+      <h1>Read the code.<br>Then change it.</h1>
+      <p class="lede">Forty-three lessons follow this repository from its first handler to its caching layer. Every example is a file you can open, and every quiz is graded on the reasoning the code actually uses.</p>
+      <div class="hero-actions">
+        {{if .Data.Next}}
+        <a class="button" href="{{lessonURL .Data.Next.Slug}}">Continue with lesson {{.Data.Next.Number}}</a>
+        {{else}}
+        <a class="button" href="/learn/courses">Browse the courses</a>
+        {{end}}
+        <a class="button button-quiet" href="/learn/exercises">Open an exercise</a>
+      </div>
+    </div>
+    <aside class="hero-note" aria-label="How the curriculum is built">
+      <p class="eyebrow">What makes this different</p>
+      <ul class="plain-list">
+        <li><span>01</span> Lessons quote the code in this repository, not a toy example.</li>
+        <li><span>02</span> Quizzes explain each option after you answer.</li>
+        <li><span>03</span> Progress is stored on the server, not in a browser counter.</li>
+      </ul>
+    </aside>
+  </section>
+
+  {{if and (not .Profile) .Data.Onboarding}}
+  <section class="panel start-panel">
+    <div>
+      <h2>Choose how you want to read</h2>
+      <p class="subtle">A guest session keeps progress for this browser. Signing in moves the same progress to your account and keeps it across devices.</p>
+    </div>
+    <div class="panel-actions">
+      <form method="post" action="/learn/session/guest">
+        <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+        <input type="hidden" name="next" value="/learn">
+        <button class="button" type="submit">Start as guest</button>
+      </form>
+      <a class="button button-quiet" href="/learn/login?next=/learn">Sign in</a>
+    </div>
+  </section>
+  {{else if .Guest}}
+  <section class="notice">
+    <p>You are reading as a guest. Progress is stored against this browser. <a href="/learn/login?next=/learn">Sign in</a> to attach it to an account.</p>
+  </section>
+  {{end}}
+
+  {{if and .Profile .Data.Summary.Started}}
+  <section class="stat-strip" aria-label="Your progress">
+    <div class="stat">
+      <span class="stat-value">{{.Data.Summary.Completed}}<span class="stat-total">/{{.Data.Summary.TotalLessons}}</span></span>
+      <span class="stat-label">lessons complete</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{.Data.Summary.MinutesRead}}<span class="stat-total"> min</span></span>
+      <span class="stat-label">reading time recorded</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{.Data.Summary.QuizAttempts}}</span>
+      <span class="stat-label">quiz attempts</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{.Data.Summary.ExercisesDone}}</span>
+      <span class="stat-label">exercises completed</span>
+    </div>
+  </section>
+  {{end}}
+
+  {{if .Data.Recent}}
+  <section class="section-block">
+    <div class="section-head">
+      <h2>Recent work</h2>
+      <a class="text-link" href="/learn/progress">All progress</a>
+    </div>
+    <ul class="card-list">
+      {{range .Data.Recent}}
+      <li class="card-row">
+        <a href="{{lessonURL .Doc.Slug}}">
+          <span class="row-num">{{.Doc.Number}}</span>
+          <span class="row-main"><strong>{{.Doc.Title}}</strong><span>{{.Doc.ReadMinutes}} min · {{timeAgo .At}}</span></span>
+          <span class="pill {{statusClass .Status}}">{{statusLabel .Status}}</span>
+          <svg class="icon row-arrow" aria-hidden="true"><use href="#i-arrow"></use></svg>
+        </a>
+      </li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+
+  <section class="section-block">
+    <div class="section-head">
+      <h2>Courses</h2>
+      <a class="text-link" href="/learn/courses">See the full sequence</a>
+    </div>
+    <div class="course-grid">
+      {{range .Data.Courses}}
+      <a class="course-card" href="/learn/courses/{{.Course.Slug}}">
+        <span class="eyebrow">{{.Total}} lessons</span>
+        <h3>{{.Course.Title}}</h3>
+        <p>{{.Course.Summary}}</p>
+        <div class="bar"><span style="width:{{.Percent}}%"></span></div>
+        <span class="course-meta">{{.Completed}} complete · {{.Percent}}%</span>
+        <span class="text-link">Open course <svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg></span>
+      </a>
+      {{end}}
+    </div>
+  </section>
+
+  {{if .Data.Review}}
+  <section class="section-block">
+    <div class="section-head">
+      <h2>Worth another pass</h2>
+      <a class="text-link" href="/learn/review">Review queue</a>
+    </div>
+    <ul class="card-list">
+      {{range .Data.Review}}
+      <li class="card-row">
+        <a href="{{lessonURL .Doc.Slug}}">
+          <span class="row-num">{{.Doc.Number}}</span>
+          <span class="row-main"><strong>{{.Doc.Title}}</strong><span>{{.Reason}}</span></span>
+          <span class="pill {{statusClass .Progress.Status}}">{{statusLabel .Progress.Status}}</span>
+          <svg class="icon row-arrow" aria-hidden="true"><use href="#i-arrow"></use></svg>
+        </a>
+      </li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+
+  {{if .Data.Bookmarks}}
+  <section class="section-block">
+    <div class="section-head">
+      <h2>Saved lessons</h2>
+      <a class="text-link" href="/learn/bookmarks">All bookmarks</a>
+    </div>
+    <div class="mini-grid">
+      {{range .Data.Bookmarks}}
+      <a class="mini-card" href="{{lessonURL .Doc.Slug}}">
+        <span class="eyebrow">Lesson {{.Doc.Number}}</span>
+        <strong>{{.Doc.Title}}</strong>
+        <span class="subtle">{{.Doc.ReadMinutes}} min read</span>
+      </a>
+      {{end}}
+    </div>
+  </section>
+  {{end}}
+
+  {{if .Data.Onboarding}}
+  <section class="section-block">
+    <div class="section-head"><h2>How a lesson works</h2></div>
+    <div class="three-grid">
+      <div class="plain-card"><span class="step">1</span><h3>Read the source</h3><p>Each lesson links to the file it explains and quotes the parts that matter.</p></div>
+      <div class="plain-card"><span class="step">2</span><h3>Answer the quiz</h3><p>Choose an answer, then read why each option is right or wrong. Nothing is revealed early.</p></div>
+      <div class="plain-card"><span class="step">3</span><h3>Change the code</h3><p>Exercises point at a specific file and state the acceptance criteria before you start.</p></div>
+    </div>
+  </section>
+  {{end}}
+</div>
+{{end}}

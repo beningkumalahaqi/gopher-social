@@ -1,0 +1,31 @@
+{{define "content"}}
+<div class="stack">
+  <header class="page-head">
+    <p class="eyebrow">Practice</p>
+    <h1>Exercises</h1>
+    <p class="lede">Short code-reading tasks tied to real files. Each one states what done looks like before you start, so you are never guessing at the target.</p>
+  </header>
+
+  {{if .Data}}
+  <div class="exercise-grid">
+    {{range .Data}}
+    <a class="exercise-card" href="{{exerciseURL .Exercise.Slug}}">
+      <div class="exercise-card-head">
+        <span class="tag">{{.Exercise.Difficulty}}</span>
+        {{if .Latest}}<span class="pill is-done">{{.Latest.Status}}</span>{{end}}
+      </div>
+      <h2>{{.Exercise.Title}}</h2>
+      <p>{{.Exercise.Summary}}</p>
+      <p class="subtle">{{plural (len .Exercise.Objectives) "objective" "objectives"}}{{if .Lesson}} · <span>Lesson {{.Lesson.Number}}</span>{{end}}</p>
+      <span class="text-link">Open exercise <svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg></span>
+    </a>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="empty-state">
+    <h2>No exercises loaded</h2>
+    <p>The activity definitions did not load. Check the content warnings at the top of the page.</p>
+  </div>
+  {{end}}
+</div>
+{{end}}

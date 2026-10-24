@@ -1,0 +1,50 @@
+{{define "content"}}
+<div class="stack">
+  <header class="page-head">
+    <p class="eyebrow"><a href="/learn/courses">Courses</a> · {{.Data.Course.Slug}}</p>
+    <h1>{{.Data.Course.Title}}</h1>
+    <p class="lede">{{.Data.Course.Summary}}</p>
+    <div class="course-summary">
+      <div class="bar"><span style="width:{{.Data.Percent}}%"></span></div>
+      <span class="subtle">{{.Data.Completed}} of {{.Data.Total}} lessons complete · {{.Data.Course.Minutes}} min of reading</span>
+    </div>
+  </header>
+
+  {{if .Data.Modules}}
+  <div class="module-stack">
+    {{range .Data.Modules}}
+    <section class="module-block">
+      <header class="module-head">
+        <div>
+          <p class="eyebrow">Module · {{.Module.From}} to {{.Module.To}}</p>
+          <h2>{{.Module.Title}}</h2>
+          <p class="subtle">{{.Module.Summary}}</p>
+        </div>
+        {{if .Module.New}}<span class="tag">New</span>{{end}}
+      </header>
+      <ol class="lesson-list">
+        {{range .Lessons}}
+        <li>
+          <a href="{{lessonURL .Doc.Slug}}">
+            <span class="lesson-num">{{.Doc.Number}}</span>
+            <span class="lesson-title">
+              <strong>{{.Doc.Title}}</strong>
+              <span>{{.Doc.Summary}}</span>
+            </span>
+            <span class="lesson-meta">
+              <span>{{.Doc.ReadMinutes}} min</span>
+              <span class="pill {{statusClass .Progress.Status}}">{{statusLabel .Progress.Status}}</span>
+              {{if .Bookmarked}}<svg class="icon" aria-label="Bookmarked"><use href="#i-bookmark"></use></svg>{{end}}
+            </span>
+          </a>
+        </li>
+        {{end}}
+      </ol>
+    </section>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="empty-state"><h2>No lessons in this course yet</h2><p>The curriculum loader did not find documents for this course.</p></div>
+  {{end}}
+</div>
+{{end}}

@@ -1,0 +1,30 @@
+{{define "content"}}
+<div class="stack">
+  <header class="page-head">
+    <p class="eyebrow">Saved</p>
+    <h1>Bookmarks</h1>
+    <p class="lede">Lessons you marked for later. Bookmarks are stored with the rest of your progress, so they follow the same account.</p>
+  </header>
+
+  {{if .Data.Items}}
+  <ul class="card-list">
+    {{range .Data.Items}}
+    <li class="card-row">
+      <a href="{{lessonURL .Doc.Slug}}">
+        <span class="row-num">{{.Doc.Number}}</span>
+        <span class="row-main"><strong>{{.Doc.Title}}</strong><span>{{.Doc.ReadMinutes}} min · {{.Doc.Summary}}</span></span>
+        <span class="pill {{statusClass .Progress.Status}}">{{statusLabel .Progress.Status}}</span>
+        <svg class="icon row-arrow" aria-hidden="true"><use href="#i-arrow"></use></svg>
+      </a>
+    </li>
+    {{end}}
+  </ul>
+  {{else}}
+  <div class="empty-state">
+    <h2>Nothing saved yet</h2>
+    <p>Use the bookmark button beside any lesson. It is the fastest way to keep a page you want to return to during the exercises.</p>
+    <a class="button" href="/learn/courses">Browse courses</a>
+  </div>
+  {{end}}
+</div>
+{{end}}

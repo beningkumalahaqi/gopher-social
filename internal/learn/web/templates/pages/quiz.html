@@ -1,0 +1,64 @@
+{{define "content"}}
+<div class="stack quiz-page">
+  <header class="page-head">
+    <p class="eyebrow">{{.Data.Quiz.Difficulty}}</p>
+    <h1>{{.Data.Quiz.Title}}</h1>
+    <p class="lede">{{.Data.Quiz.Summary}}</p>
+    <div class="meta-row">
+      {{with .Data.Lesson}}<a href="{{lessonURL .Slug}}">Back to lesson {{.Number}}: {{.Title}}</a>{{end}}
+      <span>{{plural (len .Data.Quiz.Questions) "question" "questions"}}</span>
+    </div>
+  </header>
+
+  {{if .Data.Best}}
+  <section class="notice notice-inline">
+    <p><strong>Best attempt:</strong> {{.Data.Best.Score}} of {{.Data.Best.Total}}. {{if ge .Data.Best.Percent 70}}You have passed this quiz.{{else}}A pass is 70 percent.{{end}}</p>
+  </section>
+  {{end}}
+
+  <section id="quiz-body" class="quiz-block">
+    <form class="quiz-form" method="post" action="/learn/quizzes/{{.Data.Quiz.Slug}}" hx-post="/learn/quizzes/{{.Data.Quiz.Slug}}" hx-target="#quiz-body" hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      {{range $i, $q := .Data.Quiz.Questions}}
+      <fieldset class="question">
+        <legend><span class="q-index">{{add $i 1}}</span>{{$q.Prompt}}</legend>
+        {{if $q.Code}}<pre class="code-block"><code>{{$q.Code}}</code></pre>{{end}}
+        {{if eq (printf "%s" $q.Type) "short"}}
+        <label class="visually-hidden" for="q-{{$q.ID}}">Your answer</label>
+        <textarea id="q-{{$q.ID}}" name="q_{{$q.ID}}" rows="4" placeholder="Answer in your own words"></textarea>
+        {{else}}
+        <div class="options">
+          {{range $q.Options}}
+          <label class="option">
+            <input type="{{if eq (printf "%s" $q.Type) "multiple"}}checkbox{{else}}radio{{end}}" name="q_{{$q.ID}}" value="{{.ID}}">
+            <span>{{.Text}}</span>
+          </label>
+          {{end}}
+        </div>
+        {{end}}
+      </fieldset>
+      {{end}}
+      <div class="form-actions">
+        <button class="button" type="submit">Submit answers</button>
+        <span class="subtle">Nothing is scored until you submit. Each option is explained afterwards.</span>
+      </div>
+    </form>
+  </section>
+
+  {{if .Data.Attempts}}
+  <section class="section-block">
+    <div class="section-head"><h2>Past attempts</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>When</th><th>Score</th><th>Percent</th></tr></thead>
+        <tbody>
+          {{range .Data.Attempts}}
+          <tr><td>{{.CreatedAt.Format "2 Jan 2006 15:04"}}</td><td>{{.Score}}/{{.Total}}</td><td>{{pct .Score .Total}}%</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {{end}}
+</div>
+{{end}}

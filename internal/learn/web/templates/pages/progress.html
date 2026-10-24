@@ -1,0 +1,100 @@
+{{define "content"}}
+<div class="stack">
+  <header class="page-head">
+    <p class="eyebrow">{{if .Profile}}Your record{{else}}Progress{{end}}</p>
+    <h1>Progress</h1>
+    <p class="lede">Every figure below is read from stored rows: reading percentage, quiz attempts, and exercise submissions. Nothing is estimated.</p>
+  </header>
+
+  {{if .Profile}}
+  <section class="stat-strip" aria-label="Progress totals">
+    <div class="stat">
+      <span class="stat-value">{{.Data.Summary.Completed}}<span class="stat-total">/{{.Data.Summary.TotalLessons}}</span></span>
+      <span class="stat-label">lessons complete</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{.Data.Summary.Percent}}%</span>
+      <span class="stat-label">of the curriculum started</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{.Data.Summary.MinutesRead}}</span>
+      <span class="stat-label">minutes of reading</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{if .Data.Summary.QuizTotal}}{{pct .Data.Summary.QuizScore .Data.Summary.QuizTotal}}%{{else}}0%{{end}}</span>
+      <span class="stat-label">best quiz score</span>
+    </div>
+  </section>
+
+  <section class="section-block">
+    <div class="section-head"><h2>By course</h2></div>
+    <div class="progress-course-list">
+      {{range .Data.Courses}}
+      <div class="progress-course">
+        <div class="progress-course-head">
+          <a href="/learn/courses/{{.Course.Slug}}"><strong>{{.Course.Title}}</strong></a>
+          <span class="subtle">{{.Completed}} of {{.Total}}</span>
+        </div>
+        <div class="bar"><span style="width:{{.Percent}}%"></span></div>
+      </div>
+      {{end}}
+    </div>
+  </section>
+
+  <div class="two-col">
+    <section class="section-block">
+      <div class="section-head"><h2>Quiz attempts</h2></div>
+      {{if .Data.Quizzes}}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Quiz</th><th>Score</th><th>When</th></tr></thead>
+          <tbody>
+            {{range .Data.Quizzes}}
+            <tr>
+              <td><a href="{{quizURL .QuizSlug}}">{{.QuizSlug}}</a></td>
+              <td>{{.Score}}/{{.Total}}</td>
+              <td class="subtle">{{timeAgo .CreatedAt}}</td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      {{else}}
+      <p class="subtle">No quiz attempts yet. <a class="text-link" href="/learn/courses">Pick a lesson</a> and use its quiz.</p>
+      {{end}}
+    </section>
+
+    <section class="section-block">
+      <div class="section-head"><h2>Exercise submissions</h2></div>
+      {{if .Data.Exercises}}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Exercise</th><th>Status</th><th>Score</th></tr></thead>
+          <tbody>
+            {{range .Data.Exercises}}
+            <tr>
+              <td><a href="{{exerciseURL .ExerciseSlug}}">{{.ExerciseSlug}}</a></td>
+              <td><span class="pill {{if eq .Status "completed"}}is-done{{else}}is-active{{end}}">{{.Status}}</span></td>
+              <td>{{.Score}}/{{.Total}}</td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      {{else}}
+      <p class="subtle">No exercise attempts yet. <a class="text-link" href="/learn/exercises">Open an exercise</a>.</p>
+      {{end}}
+    </section>
+  </div>
+  {{else}}
+  <div class="empty-state">
+    <h2>Progress needs a learner</h2>
+    <p>Start a guest session to keep progress in this browser, or sign in to keep it across devices. The guest progress merges into your account when you sign in.</p>
+    <div class="empty-actions">
+      <a class="button" href="/learn/login?next=/learn/progress">Sign in</a>
+      <a class="button button-quiet" href="/learn/courses">Browse first</a>
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}

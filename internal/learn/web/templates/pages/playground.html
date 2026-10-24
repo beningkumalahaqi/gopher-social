@@ -1,0 +1,41 @@
+{{define "content"}}
+<div class="stack">
+  <header class="page-head">
+    <p class="eyebrow">Scratch space</p>
+    <h1>Playground</h1>
+    <p class="lede">A small Go program, compiled by the official Go playground service. Use it to check a language detail before you change the repository.</p>
+  </header>
+
+  {{if not .Data.Enabled}}
+  <div class="notice"><p>The playground is disabled in this deployment. Everything else in the curriculum works without it.</p></div>
+  {{end}}
+
+  <div class="playground-grid">
+    <section class="playground-editor">
+      <form method="post" action="/learn/playground" hx-post="/learn/playground" hx-target="#playground-output" hx-swap="outerHTML">
+        <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+        <label class="visually-hidden" for="playground-code">Go program</label>
+        <textarea id="playground-code" name="code" rows="18" spellcheck="false" {{if not .Data.Enabled}}disabled{{end}}>{{.Data.Code}}</textarea>
+        <div class="form-actions">
+          <button class="button" type="submit" {{if not .Data.Enabled}}disabled{{end}}>Run program</button>
+          <span class="subtle">The program runs on go.dev, not on this server. Do not paste secrets.</span>
+        </div>
+      </form>
+    </section>
+
+    <section class="playground-output-panel" aria-label="Program output">
+      <p class="aside-label">Output</p>
+      {{template "playground-output" (dict "Output" .Data.Output "Error" .Data.Error "Enabled" .Data.Enabled)}}
+    </section>
+  </div>
+
+  <section class="section-block">
+    <div class="section-head"><h2>What this page does not do</h2></div>
+    <div class="three-grid">
+      <div class="plain-card"><h3>No account data</h3><p>The code you type is sent to the Go playground and is not stored in this application's database.</p></div>
+      <div class="plain-card"><h3>No file access</h3><p>There is no import of this repository, no database connection, and no environment access from the sandbox.</p></div>
+      <div class="plain-card"><h3>No infinite runs</h3><p>Runs are rate limited per address, and the request has a deadline. Long programs should be tested locally.</p></div>
+    </div>
+  </section>
+</div>
+{{end}}

@@ -1,0 +1,41 @@
+{{define "content"}}
+<div class="stack">
+  <header class="page-head">
+    <p class="eyebrow">Spaced review</p>
+    <h1>Review</h1>
+    <p class="lede">Lessons that need a second pass: quiz scores below 70 percent, and reading sessions left open for more than a week. Finish one to clear it from the list.</p>
+  </header>
+
+  {{if .Data.Items}}
+  <ul class="card-list">
+    {{range .Data.Items}}
+    <li class="card-row">
+      <a href="{{lessonURL .Doc.Slug}}">
+        <span class="row-num">{{.Doc.Number}}</span>
+        <span class="row-main"><strong>{{.Doc.Title}}</strong><span>{{.Reason}}</span></span>
+        <span class="pill {{statusClass .Progress.Status}}">{{statusLabel .Progress.Status}}</span>
+        <svg class="icon row-arrow" aria-hidden="true"><use href="#i-arrow"></use></svg>
+      </a>
+    </li>
+    {{end}}
+  </ul>
+  {{else}}
+  <div class="empty-state">
+    <h2>Nothing queued</h2>
+    <p>Review suggestions appear after a quiz attempt below 70 percent, or when a lesson has been open but unfinished for more than a week.</p>
+    <a class="button" href="/learn/courses">Continue the curriculum</a>
+  </div>
+  {{end}}
+
+  {{if .Profile}}
+  <section class="section-block">
+    <div class="section-head"><h2>How this queue is built</h2></div>
+    <div class="three-grid">
+      <div class="plain-card"><h3>Quiz evidence</h3><p>The best attempt per quiz is compared against a 70 percent pass line. Below that, the lesson is added.</p></div>
+      <div class="plain-card"><h3>Reading evidence</h3><p>A lesson opened more than seven days ago and still marked in progress is added.</p></div>
+      <div class="plain-card"><h3>No invented scores</h3><p>There is no model of what you probably know. The queue is derived from stored attempts and timestamps.</p></div>
+    </div>
+  </section>
+  {{end}}
+</div>
+{{end}}

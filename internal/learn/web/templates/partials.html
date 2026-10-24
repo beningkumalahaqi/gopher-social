@@ -1,0 +1,358 @@
+{{define "lesson-content"}}
+<div class="lesson-grid" id="lesson-content" data-lesson="{{.Doc.Slug}}">
+  <article class="lesson-main">
+    <header class="lesson-head">
+      <p class="eyebrow">{{if .Doc.Number}}Lesson {{.Doc.Number}}{{end}}{{if .Doc.ModuleSlug}}<span aria-hidden="true">·</span>{{.Doc.ModuleSlug}}{{end}}</p>
+      <h1>{{.Doc.Title}}</h1>
+      {{if .Doc.Summary}}<p class="lede">{{.Doc.Summary}}</p>{{end}}
+      <div class="meta-row">
+        <span><svg class="icon" aria-hidden="true"><use href="#i-clock"></use></svg>{{.Doc.ReadMinutes}} min read</span>
+        <span class="pill {{statusClass .Progress.Status}}">{{statusLabel .Progress.Status}}</span>
+        <a href="https://github.com/haqi/gophersocial/blob/main/{{.Doc.SourcePath}}" rel="noopener noreferrer" target="_blank">
+          Source <svg class="icon" aria-hidden="true"><use href="#i-external"></use></svg>
+        </a>
+      </div>
+    </header>
+
+    <div class="prose" data-reading-root>
+      {{.Doc.HTML}}
+    </div>
+
+    <nav class="lesson-pager" aria-label="Lesson navigation">
+      {{with .Doc.Prev}}
+      <a class="pager-link" href="{{lessonURL .Slug}}" hx-get="/learn/lessons/{{.Slug}}/content" hx-target="#lesson-content" hx-swap="outerHTML" hx-push-url="/learn/lessons/{{.Slug}}">
+        <span><svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg>Previous</span>
+        <strong>{{.Title}}</strong>
+      </a>
+      {{else}}<span></span>{{end}}
+      {{with .Doc.Next}}
+      <a class="pager-link pager-next" href="{{lessonURL .Slug}}" hx-get="/learn/lessons/{{.Slug}}/content" hx-target="#lesson-content" hx-swap="outerHTML" hx-push-url="/learn/lessons/{{.Slug}}">
+        <span>Next<svg class="icon" aria-hidden="true"><use href="#i-chevron"></use></svg></span>
+        <strong>{{.Title}}</strong>
+      </a>
+      {{end}}
+    </nav>
+  </article>
+
+  <aside class="lesson-aside" aria-label="Lesson tools">
+    {{if .Doc.TOC}}
+    <nav class="toc" aria-label="On this page">
+      <p class="aside-label">On this page</p>
+      <ul>
+        {{range .Doc.TOC}}
+        <li class="toc-l{{.Level}}"><a href="#{{.ID}}">{{.Text}}</a></li>
+        {{end}}
+      </ul>
+    </nav>
+    {{end}}
+
+    {{template "progress-control" (dict "Doc" .Doc "Progress" .Progress "NeedsProfile" false "CSRF" .CSRF)}}
+
+    {{template "bookmark-control" (dict "Doc" .Doc "Bookmarked" .Bookmarked "NeedsProfile" false "CSRF" .CSRF)}}
+
+    {{if .Quiz}}
+    <section class="aside-card">
+      <p class="aside-label">Check yourself</p>
+      <h2>{{.Quiz.Title}}</h2>
+      <p>{{plural (len .Quiz.Questions) "question" "questions"}} at {{.Quiz.Difficulty}} level. Answers stay hidden until you submit.</p>
+      <a class="button button-small" href="{{quizURL .Quiz.Slug}}">Open quiz</a>
+    </section>
+    {{end}}
+
+    <section class="aside-card note-card">
+      <p class="aside-label">Your notes</p>
+      {{if .Profile}}
+      <form class="note-form" hx-post="/learn/notes/{{.Doc.Slug}}" hx-target="#note-status" hx-swap="innerHTML">
+        <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+        <label class="visually-hidden" for="note-body">Notes for {{.Doc.Title}}</label>
+        <textarea id="note-body" name="body" rows="5" maxlength="20000" placeholder="What will you try in the code?">{{.Note}}</textarea>
+        <div class="note-actions">
+          <button class="button button-small button-quiet" type="submit">Save note</button>
+          <span id="note-status" class="subtle" role="status"></span>
+        </div>
+      </form>
+      {{else}}
+      <p class="subtle">Start a guest session or sign in to keep notes beside the lesson.</p>
+      <a class="text-link" href="/learn/login?next={{.Doc.Slug}}">Sign in</a>
+      {{end}}
+    </section>
+  </aside>
+</div>
+{{end}}
+
+{{define "progress-control"}}
+<div class="aside-card progress-card" id="progress-control">
+  <p class="aside-label">Your progress</p>
+  {{if .NeedsProfile}}
+  <p class="subtle">Start a guest session or sign in to record progress.</p>
+  <a class="button button-small button-quiet" href="/learn/login">Sign in</a>
+  {{else}}
+  <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{if eq (printf "%s" .Progress.Status) "completed"}}100{{else}}{{.Progress.ReadingPercent}}{{end}}" aria-label="Reading progress">
+    <span style="width:{{if eq (printf "%s" .Progress.Status) "completed"}}100{{else}}{{.Progress.ReadingPercent}}{{end}}%"></span>
+  </div>
+  <p class="meter-label" data-reading-label>
+    {{if eq (printf "%s" .Progress.Status) "completed"}}Completed{{else}}{{.Progress.ReadingPercent}}% read{{end}}
+  </p>
+  <form hx-post="/learn/progress" hx-target="#progress-control" hx-swap="outerHTML" class="progress-form">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <input type="hidden" name="lesson_slug" value="{{.Doc.Slug}}">
+    <input type="hidden" name="percent" value="{{.Progress.ReadingPercent}}" data-reading-percent>
+    {{if eq (printf "%s" .Progress.Status) "completed"}}
+    <button class="button button-small" type="submit" name="status" value="in_progress">Mark as in progress</button>
+    {{else}}
+    <button class="button button-small" type="submit" name="status" value="completed">Mark complete</button>
+    <button class="button button-small button-quiet" type="submit" name="status" value="">Save position</button>
+    {{end}}
+  </form>
+  {{end}}
+</div>
+{{end}}
+
+{{define "bookmark-control"}}
+<div class="aside-card bookmark-card" id="bookmark-control">
+  {{if .NeedsProfile}}
+  <p class="subtle">Start a guest session or sign in to save lessons.</p>
+  <a class="button button-small button-quiet" href="/learn/login">Sign in</a>
+  {{else if .Bookmarked}}
+  <form hx-delete="/learn/bookmarks/{{.Doc.Slug}}" hx-target="#bookmark-control" hx-swap="outerHTML">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <button class="button button-small button-quiet" type="submit" aria-pressed="true">
+      <svg class="icon" aria-hidden="true"><use href="#i-bookmark"></use></svg>Bookmarked
+    </button>
+  </form>
+  {{else}}
+  <form hx-post="/learn/bookmarks/{{.Doc.Slug}}" hx-target="#bookmark-control" hx-swap="outerHTML">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <button class="button button-small button-quiet" type="submit" aria-pressed="false">
+      <svg class="icon" aria-hidden="true"><use href="#i-bookmark"></use></svg>Save for later
+    </button>
+  </form>
+  {{end}}
+</div>
+{{end}}
+
+{{define "quiz-result"}}
+<section class="quiz-result" id="quiz-body" aria-live="polite">
+  <div class="result-head">
+    <div>
+      <p class="eyebrow">Result</p>
+      <h2>{{.Result.Score}} of {{.Result.Total}} correct</h2>
+      <p class="subtle">{{.Result.Percent}} percent{{if .Result.Passed}} · Passed{{else}} · Review the explanations below{{end}}</p>
+    </div>
+    <span class="score-badge {{if .Result.Passed}}is-done{{else}}is-attention{{end}}">{{.Result.Percent}}%</span>
+  </div>
+  {{if .Saved}}<p class="subtle">Saved to your progress.</p>{{else if .NeedsProfile}}<p class="subtle"><a class="text-link" href="/learn/login?next=/learn/quizzes/{{.Quiz.Slug}}">Sign in</a> to save this attempt.</p>{{end}}
+
+  <ol class="result-list">
+    {{range .Result.Results}}
+    {{$item := .}}
+    <li class="result-item {{if .Correct}}is-correct{{else}}is-missing{{end}}">
+      <div class="result-question">
+        <span class="result-icon" aria-hidden="true">
+          {{if .Correct}}<svg class="icon"><use href="#i-check"></use></svg>{{else}}<svg class="icon"><use href="#i-close"></use></svg>{{end}}
+        </span>
+        <div>
+          <p class="result-prompt">{{.Question.Prompt}}</p>
+          <p class="visually-hidden">{{if .Correct}}Correct{{else}}Incorrect{{end}}</p>
+        </div>
+      </div>
+      {{if .Question.Code}}<pre class="code-block"><code>{{.Question.Code}}</code></pre>{{end}}
+      {{if eq (printf "%s" .Question.Type) "short"}}
+      <p class="answer-line"><span>Your answer</span> {{if .Text}}{{.Text}}{{else}}<em>No answer</em>{{end}}</p>
+      {{else}}
+      <ul class="answer-list">
+        {{range .Question.Options}}
+        <li class="{{if $item.SelectedOption .ID}}is-selected{{end}}{{if .Correct}} is-correct{{end}}">
+          <span class="answer-mark" aria-hidden="true">{{if .Correct}}Correct{{else if $item.SelectedOption .ID}}{{if not .Correct}}Chosen{{end}}{{end}}</span>
+          <span>{{.Text}}</span>
+          {{if and ($item.SelectedOption .ID) .Feedback}}<span class="answer-feedback">{{.Feedback}}</span>{{end}}
+        </li>
+        {{end}}
+      </ul>
+      {{end}}
+      {{if .Question.Explanation}}<p class="explanation">{{.Question.Explanation}}</p>{{end}}
+      {{if .Question.Reference}}<p class="subtle">Reference: <code>{{.Question.Reference}}</code></p>{{end}}
+    </li>
+    {{end}}
+  </ol>
+  <div class="result-actions">
+    <a class="button" href="{{quizURL .Quiz.Slug}}">Try again</a>
+    {{with .Quiz.Lesson}}<a class="button button-quiet" href="{{lessonURL .Slug}}">Back to the lesson</a>{{end}}
+  </div>
+</section>
+{{end}}
+
+{{define "exercise-result"}}
+<section class="quiz-result" id="exercise-result" aria-live="polite">
+  <div class="result-head">
+    <div>
+      <p class="eyebrow">Submission</p>
+      <h2>{{.Result.Score}} of {{.Result.Total}} checks correct</h2>
+      <p class="subtle">{{.Result.Percent}} percent{{if eq .Result.Score .Result.Total}} · All checks pass{{else}} · Compare your reasoning with the notes below{{end}}</p>
+    </div>
+    <span class="score-badge {{if eq .Result.Score .Result.Total}}is-done{{else}}is-attention{{end}}">{{.Result.Percent}}%</span>
+  </div>
+  {{if .Saved}}<p class="subtle">Attempt saved.</p>{{else if .NeedsProfile}}<p class="subtle"><a class="text-link" href="/learn/login">Sign in</a> to save attempts.</p>{{end}}
+  <ol class="result-list">
+    {{range .Result.Results}}
+    {{$item := .}}
+    <li class="result-item {{if .Correct}}is-correct{{else}}is-missing{{end}}">
+      <p class="result-prompt">{{.Question.Prompt}}</p>
+      {{if eq (printf "%s" .Question.Type) "short"}}
+      <p class="answer-line"><span>Your answer</span> {{if .Text}}{{.Text}}{{else}}<em>No answer</em>{{end}}</p>
+      {{else}}
+      <ul class="answer-list">
+        {{range .Question.Options}}
+        <li class="{{if $item.SelectedOption .ID}}is-selected{{end}}{{if .Correct}} is-correct{{end}}">
+          <span class="answer-mark" aria-hidden="true">{{if .Correct}}Correct{{else if $item.SelectedOption .ID}}Chosen{{end}}</span>
+          <span>{{.Text}}</span>
+        </li>
+        {{end}}
+      </ul>
+      {{end}}
+      {{if .Question.Explanation}}<p class="explanation">{{.Question.Explanation}}</p>{{end}}
+    </li>
+    {{end}}
+  </ol>
+  <div class="result-actions">
+    <a class="button button-quiet" href="{{exerciseURL .Exercise.Slug}}">Review the exercise</a>
+    {{with .Exercise.LessonDoc}}<a class="button button-quiet" href="{{lessonURL .Slug}}">Read the lesson</a>{{end}}
+  </div>
+</section>
+{{end}}
+
+{{define "search-results"}}
+<div id="search-results" aria-live="polite">
+  {{if not .Query}}
+  <div class="empty-state">
+    <h2>Search the curriculum</h2>
+    <p>Type a concept, function name, or error message. Results include lessons, exercises, and glossary definitions.</p>
+    <div class="chip-row">
+      <a class="chip" href="/learn/search?q=context">context</a>
+      <a class="chip" href="/learn/search?q=transaction">transaction</a>
+      <a class="chip" href="/learn/search?q=receiver">receiver</a>
+      <a class="chip" href="/learn/search?q=sql">sql</a>
+    </div>
+  </div>
+  {{else if eq .Result.Total 0}}
+  <div class="empty-state">
+    <h2>No matches for “{{.Query}}”</h2>
+    <p>Try a shorter term, or remove a filter. Searching for a package name such as <code>pgx</code> often works better than a full sentence.</p>
+  </div>
+  {{else}}
+  <p class="results-count">{{plural .Result.Total "result" "results"}} for “{{.Query}}”</p>
+  {{range .Result.Groups}}
+  <section class="result-group">
+    <h2>{{.Title}} <span class="count">{{len .Hits}}</span></h2>
+    <ul class="hit-list">
+      {{range .Hits}}
+      <li>
+        <a href="{{hitURL .Kind .Slug}}">
+          <span class="hit-title">{{.Title}}</span>
+          {{if .Snippet}}<span class="hit-snippet">{{.Snippet}}</span>{{end}}
+          <span class="hit-meta">
+            {{if .Number}}Lesson {{.Number}}{{end}}
+            <span>{{.ReadMinutes}} min</span>
+            <span class="pill {{statusClass .Status}}">{{statusLabel .Status}}</span>
+          </span>
+        </a>
+      </li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+  {{end}}
+</div>
+{{end}}
+
+{{define "glossary-results"}}
+<div id="glossary-results" aria-live="polite">
+  {{if .Terms}}
+  <dl class="glossary-list">
+    {{range .Terms}}
+    <div class="glossary-item" id="{{.Slug}}">
+      <dt>{{.Term}}</dt>
+      <dd>{{.Definition}}</dd>
+    </div>
+    {{end}}
+  </dl>
+  {{else}}
+  <div class="empty-state">
+    <h2>No terms match</h2>
+    <p>Try another word, or clear the letter filter.</p>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "playground-output"}}
+<div id="playground-output" class="run-output" aria-live="polite">
+  {{if .Error}}
+  <p class="run-error">{{.Error}}</p>
+  {{else if .Output}}
+  <pre class="code-block"><code>{{.Output}}</code></pre>
+  {{else}}
+  <p class="subtle">{{if .Enabled}}Run a program to see its output.{{else}}The playground is disabled in this deployment.{{end}}</p>
+  {{end}}
+</div>
+{{end}}
+
+{{define "api-detail"}}
+<article class="api-detail" id="api-detail">
+  {{with .Op}}
+  <header class="api-detail-head">
+    <p class="eyebrow">{{.Tag}}</p>
+    <h2><span class="method method-{{lower .Method}}">{{.Method}}</span> <code>{{.Path}}</code></h2>
+    {{if .Summary}}<p class="lede">{{.Summary}}</p>{{end}}
+    {{if .Description}}<p>{{.Description}}</p>{{end}}
+  </header>
+
+  <dl class="spec-facts">
+    <div><dt>Security</dt><dd>{{.Security}}</dd></div>
+    <div><dt>Operation ID</dt><dd><code>{{.ID}}</code></dd></div>
+    <div><dt>Handler</dt><dd><code>{{.HandlerFile}}</code></dd></div>
+  </dl>
+  <p class="subtle">{{.HandlerNote}}</p>
+
+  {{if .Params}}
+  <h3>Parameters</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>In</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        {{range .Params}}
+        <tr><td><code>{{.Name}}</code></td><td>{{.In}}</td><td>{{if .Required}}Yes{{else}}No{{end}}</td><td>{{.Description}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{end}}
+
+  {{if .Request}}
+  <h3>Request body</h3>
+  <pre class="code-block"><code>{{.Request}}</code></pre>
+  {{end}}
+
+  <h3>Responses</h3>
+  <div class="response-list">
+    {{range .Responses}}
+    <details class="response">
+      <summary><span class="status-code">{{.Status}}</span> {{.Description}}</summary>
+      {{if .Schema}}<pre class="code-block"><code>{{.Schema}}</code></pre>{{end}}
+    </details>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if .Lessons}}
+  <h3>Lessons that explain it</h3>
+  <ul class="link-list">
+    {{range .Lessons}}<li><a href="{{lessonURL .Slug}}">{{.Title}}</a></li>{{end}}
+  </ul>
+  {{end}}
+</article>
+{{end}}
+
+{{define "prefs-status"}}<span class="settings-status" role="status">{{.}}</span>{{end}}
+
+{{define "note-status"}}<span class="subtle" role="status">{{.}}</span>{{end}}

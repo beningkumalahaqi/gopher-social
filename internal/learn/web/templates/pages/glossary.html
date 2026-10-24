@@ -1,0 +1,25 @@
+{{define "content"}}
+<div class="stack">
+  <header class="page-head">
+    <p class="eyebrow">Reference</p>
+    <h1>Glossary</h1>
+    <p class="lede">The vocabulary this codebase uses, defined in the same words the lessons use. Terms are parsed from the curriculum file, so they cannot drift away from it.</p>
+  </header>
+
+  <div class="glossary-tools">
+    <form class="filter-form" action="/learn/glossary" method="get" hx-get="/learn/glossary/results" hx-target="#glossary-results" hx-trigger="input changed delay:250ms, submit">
+      <label class="visually-hidden" for="glossary-q">Filter terms</label>
+      <input id="glossary-q" type="search" name="q" value="{{.Data.Query}}" placeholder="Filter terms" autocomplete="off">
+      <button class="button button-small" type="submit">Filter</button>
+    </form>
+    <nav class="letter-nav" aria-label="Jump to letter">
+      <a href="/learn/glossary"{{if not .Data.Letter}} class="is-current" aria-current="true"{{end}}>All</a>
+      {{range .Data.Letters}}
+      <a href="/learn/glossary?letter={{.}}"{{if eq . $.Data.Letter}} class="is-current" aria-current="true"{{end}}>{{.}}</a>
+      {{end}}
+    </nav>
+  </div>
+
+  {{template "glossary-results" .Data}}
+</div>
+{{end}}

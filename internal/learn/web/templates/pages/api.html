@@ -1,0 +1,46 @@
+{{define "content"}}
+<div class="stack">
+  <header class="page-head">
+    <p class="eyebrow">Reference</p>
+    <h1>API reference</h1>
+    <p class="lede">Read from the same OpenAPI document the Swagger UI uses. Each entry names the Go handler and the lesson that explains its implementation.</p>
+  </header>
+
+  <div class="api-layout">
+    <aside class="api-sidebar" aria-label="Endpoint filters">
+      <p class="aside-label">Tags</p>
+      <nav class="api-tags">
+        <a href="/learn/api"{{if not .Data.Tag}} class="is-current" aria-current="true"{{end}}>All endpoints <span class="count">{{.Data.Total}}</span></a>
+        {{range .Data.Counts}}
+        <a href="/learn/api?tag={{.Tag}}"{{if eq .Tag $.Data.Tag}} class="is-current" aria-current="true"{{end}}>{{.Tag}} <span class="count">{{.Count}}</span></a>
+        {{end}}
+      </nav>
+    </aside>
+
+    <div class="api-main">
+      {{if .Data.Op}}
+      {{template "api-detail" (dict "Op" .Data.Op "Lessons" .Data.Lessons)}}
+      {{else}}
+      <div id="api-detail" class="api-placeholder">
+        <p class="subtle">Select an endpoint to see its parameters, schemas, responses, and the handler that implements it.</p>
+      </div>
+      {{end}}
+
+      <section class="api-list-block">
+        <h2>{{if .Data.Tag}}{{.Data.Tag}}{{else}}All endpoints{{end}}</h2>
+        <ul class="api-list">
+          {{range .Data.Operations}}
+          <li>
+            <a href="/learn/api?op={{.ID}}" hx-get="/learn/api/operations/{{.ID}}" hx-target="#api-detail" hx-swap="outerHTML" hx-push-url="/learn/api?op={{.ID}}">
+              <span class="method method-{{lower .Method}}">{{.Method}}</span>
+              <code>{{.Path}}</code>
+              <span class="api-summary">{{.Summary}}</span>
+            </a>
+          </li>
+          {{end}}
+        </ul>
+      </section>
+    </div>
+  </div>
+</div>
+{{end}}
