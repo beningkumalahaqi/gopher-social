@@ -1,0 +1,6 @@
+.env
+/bin/
+/coverage.out
+*.test
+*.prof
+.DS_Store
