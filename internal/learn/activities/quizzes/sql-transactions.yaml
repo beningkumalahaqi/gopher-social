@@ -1,0 +1,95 @@
+slug: sql-transactions
+title: SQL transactions
+lesson: 10-stores-and-transactions
+difficulty: core
+summary: Rollback, commit errors, isolation, and invariants that span two tables.
+questions:
+  - id: q1
+    type: single
+    prompt: Why does every transaction begin with a deferred rollback?
+    options:
+      - id: a
+        text: It guarantees the transaction is released on every early return, and it is a no-op after commit.
+        correct: true
+        feedback: "Correct. Rollback after commit returns ErrTxClosed, which the helper ignores."
+      - id: b
+        text: It makes the transaction faster.
+        correct: false
+        feedback: "It has no performance benefit; it is a correctness safety net."
+      - id: c
+        text: It is required by pgx or the code will not compile.
+        correct: false
+        feedback: "Go does not require it. Leaked transactions hold locks until the connection dies."
+      - id: d
+        text: It commits if the function returns an error.
+        correct: false
+        feedback: "Rollback discards. Commit must be explicit and its error checked."
+    explanation: |
+      A transaction is a resource. defer rollback makes every return path safe, and
+      an explicit Commit is the only way to make the work durable.
+    reference: 10-stores-and-transactions
+
+  - id: q2
+    type: error-id
+    prompt: What is wrong with this transaction?
+    code: |
+      tx, err := pool.Begin(ctx)
+      if err != nil {
+          return err
+      }
+      defer tx.Rollback(ctx)
+
+      if _, err := tx.Exec(ctx, "UPDATE posts SET content = $1 WHERE id = $2", body, id); err != nil {
+          return err
+      }
+      if _, err := tx.Exec(ctx, "UPDATE users SET updated_at = now() WHERE id = $1", authorID); err != nil {
+          return err
+      }
+      return nil
+    options:
+      - id: a
+        text: It never commits, so the deferred rollback discards both updates.
+        correct: true
+        feedback: "Correct. Every successful path must call tx.Commit and check its error."
+      - id: b
+        text: The two statements should not share a transaction.
+        correct: false
+        feedback: "Sharing is the point: both changes must succeed or fail together."
+      - id: c
+        text: tx.Exec cannot be called twice.
+        correct: false
+        feedback: "A transaction supports many statements."
+      - id: d
+        text: defer is not allowed after Begin.
+        correct: false
+        feedback: "defer is exactly the right tool here."
+    explanation: |
+      The function returns nil, rolls back, and reports success. This is a silent
+      data-loss bug; tests must assert the row changed, not just that no error came
+      back.
+    reference: 10-stores-and-transactions
+
+  - id: q3
+    type: multiple
+    prompt: Which guarantees belong inside the same transaction as the write?
+    options:
+      - id: a
+        text: Creating a refresh token for a newly registered user
+        correct: true
+        feedback: "Correct. A user without a session row is an inconsistent registration."
+      - id: b
+        text: Checking a unique constraint before inserting
+        correct: false
+        feedback: "A pre-check races. Let the unique index and insert decide, then map the violation."
+      - id: c
+        text: Rotating a refresh token and revoking the previous one
+        correct: true
+        feedback: "Correct. A crash between the two would leave a usable replayable token."
+      - id: d
+        text: Sending a notification email
+        correct: false
+        feedback: "External side effects do not roll back. Use a queue or an outbox."
+    explanation: |
+      Transactions protect database invariants. They cannot protect an HTTP call or
+      an email. Make side effects idempotent and move them outside the transaction.
+    reference: 10-stores-and-transactions

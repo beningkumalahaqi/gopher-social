@@ -1,0 +1,79 @@
+slug: cache-hit-ratio
+title: Measure a cache instead of guessing
+lesson: 32-caching-fundamentals
+difficulty: core
+summary: Compute hit ratio and latency from a real local run, then decide whether the cache earns its complexity.
+objectives:
+  - Compute hit ratio from hits and misses.
+  - Compare cached and uncached latency with the same workload.
+  - Explain why a high hit ratio can still be a loss.
+prerequisites:
+  - Lesson 32 on caching fundamentals.
+  - Lesson 34 on the in-process cache.
+prompt: |
+  The learning platform caches search results for 90 seconds. Do not assume this is
+  a win: measure it.
+task: |
+  Run the search benchmark twice, once bypassing the cache and once using it. Record
+  p50 and p95, hit ratio, and the cost of the first request after expiry.
+hints:
+  - Use the same query set for both runs.
+  - Warm the process before measuring; cold start is not steady state.
+  - A cache with a low hit ratio adds lookups and memory for little gain.
+acceptance:
+  - You report measured numbers from your machine, not invented ones.
+  - You name the workload and query set.
+  - You state one case where the cache would be removed.
+verification: go test ./internal/learn/... -run '^$' -bench Search -benchmem
+reference_files:
+  - internal/learn/cache/cache.go
+  - internal/learn/search.go
+questions:
+  - id: q1
+    type: single
+    prompt: Your cache records 300 hits and 100 misses. What is the hit ratio?
+    options:
+      - id: a
+        text: "0.75"
+        correct: true
+        feedback: "Correct. 300 / 400."
+      - id: b
+        text: "0.25"
+        correct: false
+        feedback: "That is the miss ratio."
+      - id: c
+        text: "3.0"
+        correct: false
+        feedback: "That is the hits-to-misses ratio, which is not normalized."
+      - id: d
+        text: "400"
+        correct: false
+        feedback: "That is total requests."
+    explanation: |
+      Report hits, misses, and the workload together. A ratio without a workload is
+      not evidence.
+    reference: 32-caching-fundamentals
+  - id: q2
+    type: multiple
+    prompt: Which outcomes would justify removing the cache?
+    options:
+      - id: a
+        text: The hit ratio is low because queries are unique.
+        correct: true
+        feedback: "Correct. You pay memory and a lookup for mostly misses."
+      - id: b
+        text: p95 is worse because of lock contention under load.
+        correct: true
+        feedback: "Correct. The cache became the bottleneck."
+      - id: c
+        text: The database query is already fast and the cache saves nothing measurable.
+        correct: true
+        feedback: "Correct. Complexity without a measured gain is a loss."
+      - id: d
+        text: The cache has a TTL, which is always a reason to remove it.
+        correct: false
+        feedback: "A TTL is a design choice, not a defect."
+    explanation: |
+      A cache is a bet about reuse. If reuse is low or the cache costs more than the
+      query, remove it.
+    reference: 32-caching-fundamentals

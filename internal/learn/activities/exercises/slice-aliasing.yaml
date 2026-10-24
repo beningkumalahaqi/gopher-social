@@ -1,0 +1,95 @@
+slug: slice-aliasing
+title: Predict slice mutation
+lesson: 18-pagination
+difficulty: core
+summary: Read a snippet that appends to a shared backing array and predict every printed slice.
+objectives:
+  - Distinguish length from capacity.
+  - Trace writes through a shared backing array.
+  - Choose a defensive slice expression.
+prerequisites:
+  - Lesson 18 on pagination helpers.
+prompt: |
+  The snippet below builds two slices over one array. It appends through the short
+  view and then reslices the original.
+task: |
+  Predict the output of every Println. Then rewrite the snippet so appending to
+  view cannot change base's backing array.
+code: |
+  package main
+
+  import "fmt"
+
+  func main() {
+      base := make([]int, 2, 4)
+      base[0], base[1] = 10, 20
+
+      view := base[:2]
+      view = append(view, 30)
+      view[0] = 99
+
+      fmt.Println(base)
+      fmt.Println(view)
+      fmt.Println(base[:3])
+  }
+hints:
+  - base has length 2 and capacity 4.
+  - append writes at index 2 of the same array when capacity allows.
+  - view[0] = 99 writes through the shared array.
+acceptance:
+  - You state the three printed lines exactly.
+  - You explain why base prints with its original length.
+  - You show a fixed version that isolates the append.
+verification: go test ./internal/learn/...
+reference_files:
+  - internal/pagination/pagination.go
+  - docs-learn/18-pagination.md
+questions:
+  - id: q1
+    type: code-output
+    prompt: What does the third Println print?
+    options:
+      - id: a
+        text: "[99 20 30]"
+        correct: true
+        feedback: "Correct. The append and the write both hit the shared array."
+      - id: b
+        text: "[10 20 0]"
+        correct: false
+        feedback: "The write through view is visible; the third slot was filled by append."
+      - id: c
+        text: "panic: slice bounds out of range"
+        correct: false
+        feedback: "base has capacity 4, so base[:3] is valid."
+      - id: d
+        text: "[99 20]"
+        correct: false
+        feedback: "The full slice expression asks for three elements; all three are in range."
+    explanation: |
+      append reused the array because len(view) was below cap(view). Both slices
+      point at the same storage, so base[:3] exposes the appended value.
+    reference: 18-pagination
+  - id: q2
+    type: single
+    prompt: Which change guarantees the append allocates a new array?
+    options:
+      - id: a
+        text: view := base[:2:2]
+        correct: true
+        feedback: "Correct. The capacity is capped at the length, so append must allocate."
+      - id: b
+        text: view := base[:2]
+        correct: false
+        feedback: "That inherits capacity 4, so append reuses the array."
+      - id: c
+        text: view := append([]int{}, base...)
+        correct: false
+        feedback: "That copies, but the question is about making append to view allocate; this also allocates immediately."
+      - id: d
+        text: view := base[0:2]
+        correct: false
+        feedback: "Same as base[:2]; capacity is unchanged."
+    explanation: |
+      The third index sets capacity. s[:n:n] is the standard way to hand out a view
+      that cannot grow into the owner's array.
+    reference: 18-pagination

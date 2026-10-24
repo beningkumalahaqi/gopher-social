@@ -1,0 +1,92 @@
+slug: goroutines-and-channels
+title: Goroutines, channels, and shutdown
+lesson: 22-background-workers
+difficulty: core
+summary: Blocking, closing, bounded queues, and the leak that never shows up in a test.
+questions:
+  - id: q1
+    type: code-output
+    prompt: What happens when this program runs?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          ch := make(chan int)
+          ch <- 1
+          fmt.Println(<-ch)
+      }
+    options:
+      - id: a
+        text: It prints 1.
+        correct: false
+        feedback: "The send happens before any receiver exists, so the main goroutine blocks first."
+      - id: b
+        text: It deadlocks.
+        correct: true
+        feedback: "Correct. An unbuffered send blocks until a receiver is ready, and no other goroutine exists."
+      - id: c
+        text: It panics with a send on closed channel error.
+        correct: false
+        feedback: "The channel is never closed."
+      - id: d
+        text: It does not compile.
+        correct: false
+        feedback: "Unbuffered channels are legal; the failure is at runtime."
+    explanation: |
+      An unbuffered channel is a rendezvous. Either the send runs in a goroutine, or
+      the receive must exist first. This is also why a producer must respect
+      cancellation instead of blocking forever.
+    reference: 22-background-workers
+
+  - id: q2
+    type: multiple
+    prompt: Which statements about closing a channel are correct?
+    options:
+      - id: a
+        text: Only the sender should close a channel.
+        correct: true
+        feedback: "Correct. Closing is a statement by the sender that no more values are coming."
+      - id: b
+        text: Receiving from a closed channel returns the zero value immediately.
+        correct: true
+        feedback: "Correct. Use the two-value form to distinguish a closed channel from a real zero."
+      - id: c
+        text: Sending on a closed channel blocks until a receiver appears.
+        correct: false
+        feedback: "It panics. There is no receiver that can make the send legal."
+      - id: d
+        text: Closing a channel twice is harmless.
+        correct: false
+        feedback: "It panics. Ownership must be explicit."
+    explanation: |
+      Channel close is not cleanup. It is a signal with strict rules: one sender,
+      and receivers must handle the zero-value case. The notification worker uses a
+      separate stop signal instead of closing its job queue.
+    reference: 22-background-workers
+
+  - id: q3
+    type: single
+    prompt: A worker goroutine reads from a queue and blocks forever after the queue drains. What is the most likely defect?
+    options:
+      - id: a
+        text: The worker does not select on a stop channel or context cancellation.
+        correct: true
+        feedback: "Correct. A receive with no cancellation path is a goroutine leak."
+      - id: b
+        text: The queue buffer is too large.
+        correct: false
+        feedback: "Buffer size changes timing, not the missing exit path."
+      - id: c
+        text: The worker should use a mutex instead.
+        correct: false
+        feedback: "A mutex does not wake a blocked receiver."
+      - id: d
+        text: The worker needs a WaitGroup.
+        correct: false
+        feedback: "A WaitGroup helps the parent wait, but it does not unblock the worker."
+    explanation: |
+      Every long-lived goroutine needs a documented exit condition. In this repo the
+      worker selects on the job channel, the stop channel, and the context.
+    reference: 22-background-workers

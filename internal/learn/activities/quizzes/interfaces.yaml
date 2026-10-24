@@ -1,0 +1,99 @@
+slug: interfaces
+title: Interfaces and dynamic types
+lesson: 11-models-and-dtos
+difficulty: core
+summary: Interface satisfaction, nil interfaces, assertions, and the cost of hiding a concrete type.
+questions:
+  - id: q1
+    type: code-output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      type MyError struct{ msg string }
+
+      func (e *MyError) Error() string { return e.msg }
+
+      func find() error {
+          var e *MyError
+          return e
+      }
+
+      func main() {
+          err := find()
+          fmt.Println(err == nil)
+      }
+    options:
+      - id: a
+        text: "false"
+        correct: true
+        feedback: "Correct. The interface holds a typed nil (*MyError)(nil), so it is not nil."
+      - id: b
+        text: "true"
+        correct: false
+        feedback: "An interface is nil only when both its type and value are nil."
+      - id: c
+        text: "panic"
+        correct: false
+        feedback: "Comparing the interface with nil is valid and does not call Error."
+      - id: d
+        text: "compile error"
+        correct: false
+        feedback: "The conversion to error is implicit and legal."
+    explanation: |
+      Returning a typed nil pointer as error produces a non-nil interface. Callers
+      then take the error branch and may dereference a nil pointer. Return nil
+      explicitly when there is no error.
+    reference: 11-models-and-dtos
+
+  - id: q2
+    type: single
+    prompt: What is the safest way to inspect an error's concrete type?
+    options:
+      - id: a
+        text: errors.As with a pointer to the target type
+        correct: true
+        feedback: "Correct. It unwraps the chain and respects wrapping."
+      - id: b
+        text: A direct type assertion on the error value
+        correct: false
+        feedback: "A direct assertion fails as soon as the error is wrapped with %w."
+      - id: c
+        text: Comparing the error string with ==
+        correct: false
+        feedback: "Message text is not a contract and changes without warning."
+      - id: d
+        text: errors.Is with the concrete error value
+        correct: false
+        feedback: "errors.Is compares sentinels, not arbitrary concrete types."
+    explanation: |
+      errors.As handles wrapped errors and assigns the first match to its target.
+      assertions only look at the top value.
+    reference: 07-errors-and-envelopes
+
+  - id: q3
+    type: comparison
+    prompt: Which statement best describes an interface value?
+    options:
+      - id: a
+        text: A pair of a dynamic type and a value of that type.
+        correct: true
+        feedback: "Correct. Both parts must be nil for the interface to equal nil."
+      - id: b
+        text: A pointer to a vtable and nothing else.
+        correct: false
+        feedback: "That describes one implementation detail, not the language value, and it ignores the data word."
+      - id: c
+        text: A copy of the concrete value with no type information.
+        correct: false
+        feedback: "Without the type, the runtime could not dispatch methods."
+      - id: d
+        text: A compile-time alias for the concrete type.
+        correct: false
+        feedback: "Interfaces are dynamic. The compiler does not know the concrete type at the call site."
+    explanation: |
+      Interface values carry a type descriptor and a data word. That is why a typed
+      nil pointer stored in an interface still produces a non-nil interface.
+    reference: 11-models-and-dtos

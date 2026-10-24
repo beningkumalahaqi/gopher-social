@@ -1,0 +1,80 @@
+slug: n-plus-one
+title: Remove an N+1 query
+lesson: 39-database-query-optimization
+difficulty: advanced
+summary: Read a feed loader that queries comments per post and rewrite it as two queries.
+objectives:
+  - Recognise the round-trip pattern.
+  - Replace it with a batched query.
+  - Keep ordering and permission rules intact.
+prerequisites:
+  - Lesson 39 on query optimization.
+  - Lesson 20 on the feed.
+prompt: |
+  The feed handler loads twenty posts, then fetches comment counts one post at a
+  time. It works on seed data and degrades as the page grows.
+task: |
+  Rewrite the loader so the page costs a constant number of queries. Keep the
+  ordering of posts and do not expose counts for posts the viewer cannot see.
+hints:
+  - One aggregate query grouped by post_id can fill a map.
+  - LEFT JOIN keeps posts with zero comments.
+  - The visibility rule must stay in the SQL, not in a post-filter.
+acceptance:
+  - The loader issues two queries regardless of page size.
+  - Posts with zero comments render with a count of zero.
+  - The visibility predicate is unchanged.
+verification: go test ./tests/... -run Feed
+reference_files:
+  - internal/posts/store.go
+  - internal/feed/service.go
+  - docs-learn/20-feed-and-social-graph.md
+questions:
+  - id: q1
+    type: single
+    prompt: Which fix removes the N+1 pattern?
+    options:
+      - id: a
+        text: Load the page, then fetch counts for all page post IDs in one query.
+        correct: true
+        feedback: "Correct. Two round trips regardless of page size."
+      - id: b
+        text: Increase the page size so the per-row overhead amortizes.
+        correct: false
+        feedback: "That increases the number of queries and total work."
+      - id: c
+        text: Cache each count individually in memory.
+        correct: false
+        feedback: "It hides the round trips and adds staleness; the query shape is still wrong."
+      - id: d
+        text: Add an index on comments.post_id.
+        correct: false
+        feedback: "Useful, but twenty index lookups are still twenty round trips."
+    explanation: |
+      Batch by page. The index makes each lookup cheap; the round trips are the
+      structural cost.
+    reference: 39-database-query-optimization
+  - id: q2
+    type: error-id
+    prompt: Where does this approach leak information?
+    options:
+      - id: a
+        text: It counts comments before applying the post visibility rule.
+        correct: true
+        feedback: "Correct. A count from a hidden post can reveal that activity exists."
+      - id: b
+        text: It uses a map for the counts.
+        correct: false
+        feedback: "A map is a normal lookup structure."
+      - id: c
+        text: It issues two queries.
+        correct: false
+        feedback: "Two queries is the goal, not a leak."
+      - id: d
+        text: It uses LEFT JOIN.
+        correct: false
+        feedback: "LEFT JOIN preserves zero counts and is correct here."
+    explanation: |
+      Performance changes must preserve authorization. Join the visibility predicate
+      into the aggregate query rather than filtering after counting.
+    reference: 20-feed-and-social-graph

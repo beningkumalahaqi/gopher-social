@@ -1,0 +1,72 @@
+slug: caching-behavior
+title: Caching behavior
+lesson: 32-caching-fundamentals
+difficulty: core
+summary: Hit ratio, TTL, invalidation, and the stale read you did not intend to ship.
+questions:
+  - id: q1
+    type: single
+    prompt: A cache serves 800 requests from memory and forwards 200 to the database. What is the hit ratio?
+    options:
+      - id: a
+        text: "0.8"
+        correct: true
+        feedback: "Correct. Hits divided by total requests: 800 / 1000 = 0.8."
+      - id: b
+        text: "0.2"
+        correct: false
+        feedback: "0.2 is the miss ratio, the complement."
+      - id: c
+        text: "4.0"
+        correct: false
+        feedback: "That is the hit-to-miss count ratio, not the hit ratio."
+      - id: d
+        text: "800"
+        correct: false
+        feedback: "That is the hit count, not a ratio."
+    explanation: |
+      Hit ratio is hits / (hits + misses). Report it with the workload it came from,
+      because a high ratio on cheap queries can still be slower than no cache.
+    reference: 32-caching-fundamentals
+
+  - id: q2
+    type: multiple
+    prompt: Which are legitimate reasons to invalidate a cached profile?
+    options:
+      - id: a
+        text: The user updated their display name.
+        correct: true
+        feedback: "Correct. The write invalidates the derived read."
+      - id: b
+        text: The TTL expired.
+        correct: true
+        feedback: "Correct. Expiry is invalidation by time."
+      - id: c
+        text: A different user opened their own profile.
+        correct: false
+        feedback: "Per-user keys should not affect each other. If they do, the key is wrong."
+      - id: d
+        text: A deploy finished.
+        correct: true
+        feedback: "Correct when the cached payload shape changed. Version the key or flush on deploy."
+    explanation: |
+      Invalidation follows the key. If an update changes the value for a key, that key
+      must go. Unrelated keys must not be coupled by a global flush.
+    reference: 32-caching-fundamentals
+
+  - id: q3
+    type: truefalse
+    prompt: A cache entry with a 60 second TTL is guaranteed to be at most 60 seconds stale.
+    options:
+      - id: a
+        text: "True"
+        correct: true
+        feedback: "Correct for that entry, assuming the clock and the store are honest. It does not bound staleness from an upstream replica."
+      - id: b
+        text: "False"
+        correct: false
+        feedback: "A TTL of 60 seconds means the value is not served after 60 seconds; the served value is at most that old unless the upstream itself was stale."
+    explanation: |
+      TTL bounds age, not correctness. A read from a lagging replica can be stale
+      before it is cached. Name which staleness you are bounding.
+    reference: 32-caching-fundamentals

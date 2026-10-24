@@ -1,0 +1,92 @@
+slug: context-cancellation
+title: Context and cancellation
+lesson: 08-database-and-pgx
+difficulty: core
+summary: Deadlines, cancellation, and why every query takes the request context.
+questions:
+  - id: q1
+    type: single
+    prompt: What happens when a client disconnects during a database query?
+    options:
+      - id: a
+        text: The request context is cancelled, pgx cancels the query, and the handler should return.
+        correct: true
+        feedback: "Correct. net/http cancels the request context when the client goes away."
+      - id: b
+        text: Nothing; the query runs to completion and the result is discarded.
+        correct: false
+        feedback: "Only if the handler ignored the request context. Passing it through lets pgx cancel."
+      - id: c
+        text: The database connection is closed permanently.
+        correct: false
+        feedback: "The query is cancelled; the pooled connection is cleaned up and reused."
+      - id: d
+        text: The server panics.
+        correct: false
+        feedback: "Cancellation surfaces as context.Canceled, not a panic."
+    explanation: |
+      The request context is the cancellation channel for everything downstream.
+      Handlers that create context.Background() for queries lose this behaviour.
+    reference: 08-database-and-pgx
+
+  - id: q2
+    type: error-id
+    prompt: Which line in this handler creates a resource leak?
+    code: |
+      func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+          ctx := r.Context()
+          ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+
+          post, err := h.store.ByID(ctx, id)
+          if err != nil {
+              h.fail(w, r, err)
+              return
+          }
+          h.render(w, post)
+      }
+    options:
+      - id: a
+        text: The cancel function is never called.
+        correct: true
+        feedback: "Correct. Use defer cancel() immediately after WithTimeout."
+      - id: b
+        text: The request context should not be used as a parent.
+        correct: false
+        feedback: "The request context is exactly the right parent; it carries client cancellation."
+      - id: c
+        text: h.store.ByID should not take a context.
+        correct: false
+        feedback: "Every blocking call should take a context so it can be cancelled."
+      - id: d
+        text: There is no leak; the timer is garbage collected immediately.
+        correct: false
+        feedback: "The timer and its goroutine can outlive the request until it fires."
+    explanation: |
+      defer cancel() releases the timer and tells the runtime the work is done.
+      It is safe to call even after the operation completes.
+    reference: 08-database-and-pgx
+
+  - id: q3
+    type: multiple
+    prompt: Which values belong in a context?
+    options:
+      - id: a
+        text: A request ID for logs
+        correct: true
+        feedback: "Correct. It is request-scoped and read-only."
+      - id: b
+        text: The authenticated user identity
+        correct: true
+        feedback: "Correct. The middleware attaches it, handlers read it."
+      - id: c
+        text: A mutable cache shared by handlers
+        correct: false
+        feedback: "Context values should not be mutable shared state. Use a dependency passed to the handler."
+      - id: d
+        text: A function's optional parameters
+        correct: false
+        feedback: "That hides the API. Use real parameters or a typed options struct."
+    explanation: |
+      Context is for request-scoped metadata and cancellation, not a bag of
+      dependencies. Keep it small and immutable.
+    reference: 08-database-and-pgx

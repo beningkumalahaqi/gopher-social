@@ -1,0 +1,89 @@
+slug: error-wrapping
+title: Find the broken error chain
+lesson: 07-errors-and-envelopes
+difficulty: core
+summary: Read a loader that loses its sentinel and repair the wrap so errors.Is still works.
+objectives:
+  - Explain what %w preserves and %v discards.
+  - Locate the point where the chain breaks.
+  - Keep the client-facing message stable.
+prerequisites:
+  - Lesson 07 on errors and envelopes.
+prompt: |
+  A store returns ErrNotFound, the service wraps it, and the handler checks it. The
+  404 branch never runs.
+task: |
+  Identify the line that breaks the chain and rewrite it. Then explain why the API
+  still returns a useful message and request_id.
+code: |
+  var ErrNotFound = errors.New("not found")
+
+  func load(ctx context.Context, id uuid.UUID) (Post, error) {
+      post, err := store.ByID(ctx, id)
+      if err != nil {
+          return Post{}, fmt.Errorf("load post %s: %v", id, err)
+      }
+      return post, nil
+  }
+
+  func handle(w http.ResponseWriter, r *http.Request) {
+      post, err := load(r.Context(), id)
+      if errors.Is(err, ErrNotFound) {
+          response.Error(w, r, err)
+          return
+      }
+      // ...
+  }
+hints:
+  - Compare %v and %w in fmt.Errorf.
+  - errors.Is walks Unwrap; a formatted string has no Unwrap.
+acceptance:
+  - You name the exact line and the exact replacement.
+  - You show that errors.Is now returns true.
+  - The message still includes the post ID for operators.
+verification: go test ./internal/api/handlers/...
+reference_files:
+  - internal/apperr/apperr.go
+  - internal/api/response/response.go
+  - internal/posts/store.go
+questions:
+  - id: q1
+    type: single
+    prompt: Which wrap preserves the sentinel?
+    options:
+      - id: a
+        text: 'fmt.Errorf("load post %s: %w", id, err)'
+        correct: true
+        feedback: "Correct. %w implements Unwrap."
+      - id: b
+        text: 'fmt.Errorf("load post %s: %v", id, err)'
+        correct: false
+        feedback: "This produces a new string error with no cause."
+      - id: c
+        text: 'fmt.Errorf("load post %s: %s", id, err)'
+        correct: false
+        feedback: "Same problem: formatting destroys identity."
+      - id: d
+        text: 'errors.New("load post: " + err.Error())'
+        correct: false
+        feedback: "Concatenation creates a fresh error with no chain."
+    explanation: |
+      The wrapper must expose Unwrap. That is exactly what %w does and what the
+      response classifier relies on.
+    reference: 07-errors-and-envelopes
+  - id: q2
+    type: truefalse
+    prompt: A wrapped error's Error() string is part of the API contract for clients.
+    options:
+      - id: a
+        text: "True"
+        correct: false
+        feedback: "Message text is for humans and may change. The stable code in the envelope is the contract."
+      - id: b
+        text: "False"
+        correct: true
+        feedback: "Correct. Clients should branch on the error code, not on prose."
+    explanation: |
+      Keep messages useful and keep codes stable. That separation is what lets the
+      API improve wording without breaking clients.
+    reference: 07-errors-and-envelopes

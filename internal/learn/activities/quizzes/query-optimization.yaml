@@ -1,0 +1,80 @@
+slug: query-optimization
+title: Query optimization and indexes
+lesson: 39-database-query-optimization
+difficulty: advanced
+summary: Composite index order, EXPLAIN, N+1, and the cost of OFFSET.
+questions:
+  - id: q1
+    type: single
+    prompt: The feed queries posts by author, newest first, with a stable tie-breaker. Which index shape matches it?
+    options:
+      - id: a
+        text: "(author_id, created_at DESC, id DESC)"
+        correct: true
+        feedback: "Correct. Equality column first, then the ordering columns in query order."
+      - id: b
+        text: "(created_at DESC, author_id, id DESC)"
+        correct: false
+        feedback: "The leading column is the range, so the author filter cannot use the index efficiently."
+      - id: c
+        text: "(author_id) only"
+        correct: false
+        feedback: "That finds the rows but still requires a sort for the ordering."
+      - id: d
+        text: "(id DESC, author_id)"
+        correct: false
+        feedback: "Ordering by id does not match ordering by time."
+    explanation: |
+      Composite index order follows the query: equality predicates first, then the
+      columns used for ordering. This repo's posts indexes follow exactly that shape.
+    reference: 39-database-query-optimization
+
+  - id: q2
+    type: multiple
+    prompt: Which are signs of an N+1 query problem?
+    options:
+      - id: a
+        text: The page issues one query per row after the initial list query.
+        correct: true
+        feedback: "Correct. That is the definition: N rows produce N extra round trips."
+      - id: b
+        text: Latency grows roughly linearly with page size while row count is small.
+        correct: true
+        feedback: "Correct, until the round trips dominate."
+      - id: c
+        text: A single query with a JOIN is used to load related rows.
+        correct: false
+        feedback: "That is the fix, not the symptom."
+      - id: d
+        text: The database CPU is saturated by one expensive aggregate.
+        correct: false
+        feedback: "That is a different bottleneck. N+1 is about round-trip count."
+    explanation: |
+      Batch the related load: one IN query for the page, or a JOIN with an explicit
+      ordering. Measure round trips, not just total SQL time.
+    reference: 39-database-query-optimization
+
+  - id: q3
+    type: code-output
+    prompt: The endpoint paginates with LIMIT 20 OFFSET 100000. What happens as the offset grows?
+    options:
+      - id: a
+        text: PostgreSQL reads and discards the skipped rows, so later pages get slower.
+        correct: true
+        feedback: "Correct. OFFSET still produces the rows; it only hides them."
+      - id: b
+        text: The index jumps directly to the offset, so cost is constant.
+        correct: false
+        feedback: "There is no skip-ahead for an arbitrary offset in this plan shape."
+      - id: c
+        text: PostgreSQL rejects offsets above 10000.
+        correct: false
+        feedback: "There is no such limit."
+      - id: d
+        text: The result is incorrect after the first page.
+        correct: false
+        feedback: "The rows are correct; the cost and stability are the problem."
+    explanation: |
+      Keyset pagination carries the last row's sort key and adds a WHERE clause. It
+      stays index-friendly at any depth and does not shift when rows are inserted.
+    reference: 39-database-query-optimization

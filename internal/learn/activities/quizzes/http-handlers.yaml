@@ -1,0 +1,86 @@
+slug: http-handlers
+title: HTTP handlers and request limits
+lesson: 17-handlers
+difficulty: core
+summary: Status codes, body limits, decoding discipline, and writing headers exactly once.
+questions:
+  - id: q1
+    type: single
+    prompt: A handler calls w.WriteHeader(400), then discovers the request is actually valid. What should it do?
+    options:
+      - id: a
+        text: Nothing can be undone; the status is already sent. Validate before writing.
+        correct: true
+        feedback: "Correct. Headers are flushed with the first write; there is no rollback."
+      - id: b
+        text: Call w.WriteHeader(200) again to overwrite it.
+        correct: false
+        feedback: "The second call logs a superfluous WriteHeader warning and has no effect."
+      - id: c
+        text: Call w.Reset().
+        correct: false
+        feedback: "There is no such method on http.ResponseWriter."
+      - id: d
+        text: Panic so middleware can rewrite the response.
+        correct: false
+        feedback: "Recovery middleware can only produce a 500, and the partial body may already be sent."
+    explanation: |
+      Decide the status after decoding and validating. This is why the API's handlers
+      decode first and only then call response.Data.
+    reference: 17-handlers
+
+  - id: q2
+    type: multiple
+    prompt: Which practices make a JSON handler safe under load?
+    options:
+      - id: a
+        text: Wrap the body with http.MaxBytesReader before decoding.
+        correct: true
+        feedback: "Correct. It bounds memory per request and returns a clear 413."
+      - id: b
+        text: Call DisallowUnknownFields so typos fail loudly.
+        correct: true
+        feedback: "Correct. Silent acceptance of misspelled fields hides client bugs."
+      - id: c
+        text: Decode a second time into an empty struct to catch trailing data.
+        correct: true
+        feedback: "Correct. The second decode must return io.EOF."
+      - id: d
+        text: Read the entire body into a string first and log it.
+        correct: false
+        feedback: "That defeats limits and can log secrets. Decode into typed structs."
+    explanation: |
+      Strict decoding is part of the contract. Limits and unknown-field rejection turn
+      ambiguous input into a specific 4xx instead of a confusing 500 later.
+    reference: 17-handlers
+
+  - id: q3
+    type: code-output
+    prompt: What status does the client receive?
+    code: |
+      func handler(w http.ResponseWriter, r *http.Request) {
+          w.Header().Set("Content-Type", "text/plain")
+          w.WriteHeader(http.StatusCreated)
+          w.Write([]byte("ok"))
+      }
+    options:
+      - id: a
+        text: "201"
+        correct: true
+        feedback: "Correct. WriteHeader sends 201; the body follows."
+      - id: b
+        text: "200"
+        correct: false
+        feedback: "The default 200 applies only when WriteHeader is not called."
+      - id: c
+        text: "204"
+        correct: false
+        feedback: "204 means no content, but a body is written here."
+      - id: d
+        text: "500"
+        correct: false
+        feedback: "Nothing fails in this handler."
+    explanation: |
+      WriteHeader can be called once. Everything after it is body bytes. Keep the
+      ordering explicit, and let a single helper own response writing.
+    reference: 17-handlers

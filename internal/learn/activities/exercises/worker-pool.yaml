@@ -1,0 +1,88 @@
+slug: worker-pool
+title: Bound the workers
+lesson: 22-background-workers
+difficulty: advanced
+summary: Read an unbounded goroutine fan-out and replace it with a bounded pool that drains.
+objectives:
+  - Explain why one goroutine per item is a denial-of-service on yourself.
+  - Apply a bounded queue and a stop signal.
+  - Prove the pool drains on shutdown.
+prerequisites:
+  - Lesson 22 on background workers.
+  - Lesson 41 on concurrency performance.
+prompt: |
+  A notification fan-out starts a goroutine per recipient. Under a large audience
+  it opens thousands of database connections and never finishes shutdown cleanly.
+task: |
+  Rewrite the fan-out with a fixed worker count and a bounded queue. Define the
+  drop or block policy explicitly, and show how Stop waits for in-flight work.
+code: |
+  func (s *Service) NotifyAll(ctx context.Context, recipients []uuid.UUID) {
+      for _, id := range recipients {
+          go func(id uuid.UUID) {
+              _ = s.deliver(ctx, id)
+          }(id)
+      }
+  }
+hints:
+  - A channel with capacity bounds the queue.
+  - Workers exit when the job channel closes or the stop channel closes.
+  - sync.WaitGroup makes Stop wait for workers.
+acceptance:
+  - Goroutine count is bounded by a constant.
+  - The queue is bounded; the drop policy is named in a comment.
+  - Stop cancels workers and waits, with a deadline.
+verification: go test -race ./internal/notifications/...
+reference_files:
+  - internal/notifications/service.go
+  - docs-learn/examples/04-worker-pool/main.go
+questions:
+  - id: q1
+    type: single
+    prompt: What is the primary risk of go func() per recipient?
+    options:
+      - id: a
+        text: Unbounded goroutines and downstream connections, with no backpressure.
+        correct: true
+        feedback: "Correct. Memory, schedulers, and the database all feel it at once."
+      - id: b
+        text: The closure captures the loop variable incorrectly.
+        correct: false
+        feedback: "The ID is passed as a parameter here, so that classic bug is avoided."
+      - id: c
+        text: Go refuses to start more than 100 goroutines.
+        correct: false
+        feedback: "There is no such limit."
+      - id: d
+        text: The context cannot be used inside a goroutine.
+        correct: false
+        feedback: "Contexts are safe for concurrent use."
+    explanation: |
+      Concurrency without a bound is not throughput, it is an outage waiting for a
+      large enough input. Bound the work and decide what happens when the queue is
+      full.
+    reference: 22-background-workers
+  - id: q2
+    type: multiple
+    prompt: Which are required for a clean shutdown?
+    options:
+      - id: a
+        text: A stop signal the workers select on
+        correct: true
+        feedback: "Correct. Without it, idle workers block forever."
+      - id: b
+        text: A WaitGroup that Stop waits on
+        correct: true
+        feedback: "Correct. It proves in-flight jobs finished or were abandoned deliberately."
+      - id: c
+        text: Closing the job channel from a receiver
+        correct: false
+        feedback: "Only the sender closes. Closing from a receiver races with producers."
+      - id: d
+        text: A deadline for the shutdown wait
+        correct: true
+        feedback: "Correct. A hung worker must not hold the process open indefinitely."
+    explanation: |
+      Shutdown is a protocol: stop accepting, cancel, wait with a deadline, report
+      what was dropped. The existing notifier follows that shape.
+    reference: 22-background-workers

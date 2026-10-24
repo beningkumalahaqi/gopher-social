@@ -1,0 +1,98 @@
+slug: error-wrapping
+title: Error wrapping and classification
+lesson: 07-errors-and-envelopes
+difficulty: core
+summary: Preserve causes with %w, compare with errors.Is, and keep client-facing messages stable.
+questions:
+  - id: q1
+    type: single
+    prompt: 'What does fmt.Errorf("load user: %w", err) do differently from %v?'
+    options:
+      - id: a
+        text: It keeps the original error in the chain so errors.Is and errors.As can find it.
+        correct: true
+        feedback: "Correct. %w wraps; %v only formats the message."
+      - id: b
+        text: It hides the original message.
+        correct: false
+        feedback: "The message includes the original text; the difference is the unwrap chain."
+      - id: c
+        text: It makes the new error comparable with == to the original.
+        correct: false
+        feedback: "== still compares the new wrapper. errors.Is is the correct comparison."
+      - id: d
+        text: It automatically maps the error to a 404.
+        correct: false
+        feedback: "Status mapping is a transport concern and does not belong to fmt.Errorf."
+    explanation: |
+      Wrapping adds context without losing identity. The API's response layer maps
+      sentinels to status codes, so the chain must survive all the way up.
+    reference: 07-errors-and-envelopes
+
+  - id: q2
+    type: code-output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import (
+          "errors"
+          "fmt"
+      )
+
+      var ErrNotFound = errors.New("not found")
+
+      func load() error {
+          return fmt.Errorf("load post: %w", ErrNotFound)
+      }
+
+      func main() {
+          err := load()
+          fmt.Println(errors.Is(err, ErrNotFound))
+      }
+    options:
+      - id: a
+        text: "true"
+        correct: true
+        feedback: "Correct. %w preserves the sentinel in the unwrap chain."
+      - id: b
+        text: "false"
+        correct: false
+        feedback: "errors.Is walks the chain; it does not compare only the outer error."
+      - id: c
+        text: "panic"
+        correct: false
+        feedback: "Nothing here panics."
+      - id: d
+        text: "compile error"
+        correct: false
+        feedback: "All imports are used and the signatures are valid."
+    explanation: |
+      errors.Is is defined in terms of Unwrap. A wrapper created with %w exposes the
+      original, so the sentinel check succeeds even though the outer error is new.
+    reference: 07-errors-and-envelopes
+
+  - id: q3
+    type: multiple
+    prompt: Which practices keep error handling honest in this API?
+    options:
+      - id: a
+        text: Log unexpected errors once, at the edge, with the request ID.
+        correct: true
+        feedback: "Correct. Repeated logging at every layer duplicates noise and hides the origin."
+      - id: b
+        text: Return a stable machine-readable code alongside a human message.
+        correct: true
+        feedback: "Correct. The response envelope uses a stable code so clients can branch safely."
+      - id: c
+        text: Include the raw SQL error text in every 500 response.
+        correct: false
+        feedback: "That leaks schema and query details. Log it; return a generic message."
+      - id: d
+        text: Wrap sentinel errors with context so the cause survives.
+        correct: true
+        feedback: "Correct. Callers can still use errors.Is while the log shows where it failed."
+    explanation: |
+      Errors have two audiences: the client needs a stable contract, and the operator
+      needs context. Keep those concerns separate.
+    reference: 07-errors-and-envelopes

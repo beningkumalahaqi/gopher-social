@@ -1,0 +1,109 @@
+slug: value-vs-pointer-receivers
+title: Value and pointer receivers
+lesson: 11-models-and-dtos
+difficulty: core
+summary: Decide when a method needs the address of its receiver, and why the compiler sometimes takes it for you.
+questions:
+  - id: q1
+    type: code-output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      type Counter struct{ n int }
+
+      func (c Counter) Inc() { c.n++ }
+
+      func main() {
+          c := Counter{}
+          c.Inc()
+          fmt.Println(c.n)
+      }
+    options:
+      - id: a
+        text: "0"
+        correct: true
+        feedback: "Inc receives a copy, so the increment is discarded when the method returns."
+      - id: b
+        text: "1"
+        correct: false
+        feedback: "That would be true for a pointer receiver. A value receiver operates on a copy."
+      - id: c
+        text: "compile error"
+        correct: false
+        feedback: "The call is valid. Go copies the receiver; it does not reject it."
+      - id: d
+        text: "panic"
+        correct: false
+        feedback: "There is no nil pointer and no out-of-range access, so nothing panics."
+    explanation: |
+      A value receiver copies the struct into the method. Mutating the copy has no
+      effect on the caller. Store methods that write to the row or need identity
+      should use pointer receivers.
+    reference: 11-models-and-dtos
+
+  - id: q2
+    type: multiple
+    prompt: Which statements about receiver choice are correct?
+    options:
+      - id: a
+        text: A pointer receiver can mutate the value it points to.
+        correct: true
+        feedback: "Correct. The method receives the address, so writes are visible to the caller."
+      - id: b
+        text: A value receiver can be called on an addressable value without writing &.
+        correct: true
+        feedback: "Correct. Go takes the address automatically for addressable values."
+      - id: c
+        text: A value receiver is always cheaper because it avoids a pointer.
+        correct: false
+        feedback: "A value receiver copies the whole struct. For a large struct that is more work, not less."
+      - id: d
+        text: Methods with pointer receivers are part of the method set of the value type.
+        correct: false
+        feedback: "They belong to *T, not T. That difference decides whether T satisfies an interface."
+    explanation: |
+      Receiver choice is about semantics first: does the method mutate, and does the
+      type need identity? Copy cost is secondary. The method set then decides
+      interface satisfaction, which is why mixing receivers on one type is a smell.
+    reference: 11-models-and-dtos
+
+  - id: q3
+    type: error-id
+    prompt: Why does this program fail to compile?
+    code: |
+      package main
+
+      type Greeter struct{}
+
+      func (g *Greeter) Greet() string { return "hello" }
+
+      type Speaker interface{ Greet() string }
+
+      var _ Speaker = Greeter{}
+
+      func main() {}
+    options:
+      - id: a
+        text: Greeter does not implement Speaker because Greet has a pointer receiver.
+        correct: true
+        feedback: "Correct. *Greeter implements Speaker; Greeter does not. Use &Greeter{}."
+      - id: b
+        text: The blank identifier cannot be used with an interface type.
+        correct: false
+        feedback: "var _ Speaker = ... is a standard compile-time assertion and is valid."
+      - id: c
+        text: Greet must return an error as its second value.
+        correct: false
+        feedback: "The interface declares exactly one return value, and the method matches it."
+      - id: d
+        text: Methods cannot be declared before their type in the file.
+        correct: false
+        feedback: "Declaration order in a Go file does not matter."
+    explanation: |
+      The method set of Greeter is empty; the method set of *Greeter contains Greet.
+      Assigning a value to an interface requires the value's method set to include
+      every interface method.
+    reference: 11-models-and-dtos

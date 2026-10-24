@@ -1,0 +1,88 @@
+slug: slice-aliasing
+title: Slice aliasing and capacity
+lesson: 18-pagination
+difficulty: core
+summary: Length, capacity, and the shared backing array behind append.
+questions:
+  - id: q1
+    type: code-output
+    prompt: What does this program print?
+    code: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          base := make([]int, 2, 4)
+          base[0], base[1] = 1, 2
+
+          view := base[:2]
+          view = append(view, 3)
+
+          fmt.Println(base)
+          fmt.Println(view)
+      }
+    options:
+      - id: a
+        text: "[1 2] then [1 2 3]"
+        correct: false
+        feedback: "append wrote into the shared backing array, so base's underlying array changed even though its length did not."
+      - id: b
+        text: "[1 2 3] then [1 2 3]"
+        correct: false
+        feedback: "base still has length 2. Printing it shows two elements, not three."
+      - id: c
+        text: "[1 2] then [1 2 3], but the third element is visible through base[:3]"
+        correct: true
+        feedback: "Correct. Within capacity, append reuses the array; base gains no length but the data is there."
+      - id: d
+        text: "compile error"
+        correct: false
+        feedback: "Appending to a slice is legal and the program compiles."
+    explanation: |
+      Length is a window; capacity is how far the window can grow without a new
+      allocation. Two slices can share a backing array, so writing through one is
+      visible through the other when their ranges overlap.
+    reference: 18-pagination
+
+  - id: q2
+    type: single
+    prompt: How do you force append to copy instead of writing into a shared array?
+    options:
+      - id: a
+        text: Use the full slice expression s[:len(s):len(s)] before appending.
+        correct: true
+        feedback: "Correct. It caps capacity at length, so the first append allocates."
+      - id: b
+        text: Call runtime.GC before appending.
+        correct: false
+        feedback: "Garbage collection has no effect on whether append reuses capacity."
+      - id: c
+        text: Convert the slice to an array first.
+        correct: false
+        feedback: "That copies the data once, but it does not address append's aliasing behaviour generally."
+      - id: d
+        text: Append with a nil destination.
+        correct: false
+        feedback: "Appending to nil allocates, but you lose the existing elements unless you append them too."
+    explanation: |
+      The three-index slice expression controls capacity. Handing callers s[:n:n]
+      prevents them from appending into storage you still own.
+    reference: 18-pagination
+
+  - id: q3
+    type: truefalse
+    prompt: A slice's length and capacity are always equal.
+    options:
+      - id: a
+        text: "True"
+        correct: false
+        feedback: "make([]int, 0, 10) has length 0 and capacity 10."
+      - id: b
+        text: "False"
+        correct: true
+        feedback: "Correct. Capacity can exceed length; that gap is what append can use without allocating."
+    explanation: |
+      len is the number of elements you can index. cap is the size of the backing
+      array from the slice's start. Confusing them is the root of most slice bugs.
+    reference: 18-pagination

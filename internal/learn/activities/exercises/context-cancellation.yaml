@@ -1,0 +1,92 @@
+slug: context-cancellation
+title: Stop work when the client leaves
+lesson: 08-database-and-pgx
+difficulty: core
+summary: Trace a handler that ignores cancellation and repair the call chain.
+objectives:
+  - Follow the request context into the store.
+  - Spot a background context used for request work.
+  - Add a bounded timeout without leaking its timer.
+prerequisites:
+  - Lesson 08 on pgx and contexts.
+prompt: |
+  The service layer rebuilds a context with context.Background(). Under a slow
+  query, disconnected clients still consume database connections.
+task: |
+  Rewrite the snippet so the request deadline and cancellation reach the query.
+  Add a 2 second ceiling and release the timer.
+code: |
+  func (s *Service) ByID(ctx context.Context, id uuid.UUID) (Post, error) {
+      ctx = context.Background()
+      return s.posts.ByID(ctx, id)
+  }
+
+  func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+      post, err := h.service.ByID(r.Context(), id)
+      if err != nil {
+          h.fail(w, r, err)
+          return
+      }
+      h.render(w, post)
+  }
+hints:
+  - context.Background() has no deadline and cannot be cancelled.
+  - context.WithTimeout returns a cancel function that must be deferred.
+acceptance:
+  - No context.Background() remains in the request path.
+  - The query receives a context derived from r.Context().
+  - cancel is deferred immediately after WithTimeout.
+verification: go test ./internal/learn/... ./tests/...
+reference_files:
+  - internal/database/database.go
+  - internal/posts/store.go
+  - internal/api/middleware/middleware.go
+questions:
+  - id: q1
+    type: error-id
+    prompt: Which line causes abandoned database work?
+    options:
+      - id: a
+        text: ctx = context.Background()
+        correct: true
+        feedback: "Correct. It severs the request context, so client cancellation never reaches pgx."
+      - id: b
+        text: h.service.ByID(r.Context(), id)
+        correct: false
+        feedback: "That is the correct call. The damage happens inside the service."
+      - id: c
+        text: h.fail(w, r, err)
+        correct: false
+        feedback: "Error rendering is fine; the query has already lost cancellation."
+      - id: d
+        text: h.render(w, post)
+        correct: false
+        feedback: "Rendering happens after the query."
+    explanation: |
+      A background context is for work that must outlive a request (startup, a
+      deliberate background job). It is never the right parent for request work.
+    reference: 08-database-and-pgx
+  - id: q2
+    type: single
+    prompt: Where should defer cancel() go?
+    options:
+      - id: a
+        text: Immediately after context.WithTimeout.
+        correct: true
+        feedback: "Correct. It covers every return path and releases the timer."
+      - id: b
+        text: At the end of the function, only on the success path.
+        correct: false
+        feedback: "Early returns would leak the timer."
+      - id: c
+        text: Inside the store, after the query.
+        correct: false
+        feedback: "The function that creates the context owns the cancel."
+      - id: d
+        text: Never; the garbage collector handles it.
+        correct: false
+        feedback: "The timer goroutine can survive until the deadline."
+    explanation: |
+      Ownership is simple: whoever calls WithTimeout calls cancel, with defer right
+      next to it. That includes error paths.
+    reference: 08-database-and-pgx
