@@ -1,0 +1,25 @@
+meta {
+  name: Create Comment
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/posts/{{postId}}/comments
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "content": "Nice post!"
+  }
+}
+
+script:post-response {
+  bru.setVar("commentId", res.body.data.id);
+}

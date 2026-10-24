@@ -1,0 +1,1246 @@
+openapi: 3.1.0
+info:
+  title: GopherSocial API
+  version: 1.0.0
+  description: |
+    Social media REST API used by the GopherSocial learning project.
+
+    All application routes are under `/api/v1`. Successful responses use a
+    `data` envelope; collections also include `meta`. Errors use an `error`
+    envelope with a stable `code` and a `request_id`.
+
+    `optional` security means the endpoint works anonymously, but a valid bearer
+    token adds viewer-specific fields (for example `viewer_reaction`).
+
+    Interactive docs: open `/swagger/` while the server is running.
+servers:
+  - url: /
+    description: Current host (Swagger UI and API share an origin)
+  - url: http://localhost:8080
+    description: Local development
+tags:
+  - name: Operations
+  - name: Auth
+  - name: Users
+  - name: Posts
+  - name: Comments
+  - name: Reactions
+  - name: Discovery
+  - name: Notifications
+
+paths:
+  /healthz:
+    get:
+      tags: [Operations]
+      operationId: live
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: ok }
+                required: [status]
+
+  /readyz:
+    get:
+      tags: [Operations]
+      operationId: ready
+      summary: Readiness probe
+      description: Pings PostgreSQL with a short timeout.
+      security: []
+      responses:
+        "200":
+          description: Ready to serve traffic
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: ready }
+                required: [status]
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Create an account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [username, email, password]
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 30
+                  pattern: "^[a-z0-9_]+$"
+                email: { type: string, format: email, maxLength: 254 }
+                password: { type: string, minLength: 8, maxLength: 128 }
+                display_name: { type: string, maxLength: 60 }
+            example:
+              username: zoe
+              email: zoe@example.com
+              password: Password123!
+              display_name: Zoe
+      responses:
+        "201":
+          description: Account created; session issued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Session" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Log in with username or email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [login, password]
+              properties:
+                login: { type: string, maxLength: 254 }
+                password: { type: string, maxLength: 128 }
+            example:
+              login: alice
+              password: Password123!
+      responses:
+        "200":
+          description: Session issued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Session" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refresh
+      summary: Rotate a refresh token
+      description: |
+        Returns a new access token and a new refresh token. The presented token
+        is revoked. Presenting an already-rotated token revokes the entire
+        session family.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "200":
+          description: Rotated session
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Session" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Revoke a refresh token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "204":
+          description: Token revoked (or already invalid)
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/users/me:
+    get:
+      tags: [Users]
+      operationId: getMe
+      summary: Get the authenticated user
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Private profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/PrivateUser" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      tags: [Users]
+      operationId: updateMe
+      summary: Update the authenticated user
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                display_name: { type: string, maxLength: 60 }
+                bio: { type: string, maxLength: 160 }
+                avatar_url:
+                  type: [string, "null"]
+                  format: uri
+                  maxLength: 500
+      responses:
+        "200":
+          description: Updated private profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/PrivateUser" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/users/me/password:
+    patch:
+      tags: [Users]
+      operationId: changePassword
+      summary: Change password and revoke all sessions
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string, maxLength: 128 }
+                new_password: { type: string, minLength: 8, maxLength: 128 }
+      responses:
+        "204":
+          description: Password changed; all refresh sessions revoked
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/users/{username}:
+    get:
+      tags: [Users]
+      operationId: getUser
+      summary: Get a public profile
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Username"
+      responses:
+        "200":
+          description: Public profile with stats
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Profile" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/users/{username}/posts:
+    get:
+      tags: [Users, Posts]
+      operationId: getUserPosts
+      summary: List posts by author
+      description: Drafts are only visible to their author when authenticated.
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/Username"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/StatusFilter"
+      responses:
+        "200":
+          description: Page of posts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Post" }
+                  meta: { $ref: "#/components/schemas/OffsetMeta" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/users/{username}/followers:
+    get:
+      tags: [Users]
+      operationId: listFollowers
+      summary: List followers
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Username"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Page of users
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/User" }
+                  meta: { $ref: "#/components/schemas/OffsetMeta" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/users/{username}/following:
+    get:
+      tags: [Users]
+      operationId: listFollowing
+      summary: List followed users
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Username"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Page of users
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/User" }
+                  meta: { $ref: "#/components/schemas/OffsetMeta" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/users/{username}/follow-status:
+    get:
+      tags: [Users]
+      operationId: getFollowStatus
+      summary: Relationship between viewer and target
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Username"
+      responses:
+        "200":
+          description: Relationship flags
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [following, followed_by]
+                    properties:
+                      following: { type: boolean }
+                      followed_by: { type: boolean }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/users/{username}/suggestions:
+    get:
+      tags: [Users, Discovery]
+      operationId: getSuggestions
+      summary: Suggest users to follow
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Username"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/User" }
+                  meta:
+                    type: object
+                    properties:
+                      limit: { type: integer }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/users/{username}/follow:
+    post:
+      tags: [Users]
+      operationId: follow
+      summary: Follow a user (idempotent)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Username"
+      responses:
+        "204":
+          description: Following
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Users]
+      operationId: unfollow
+      summary: Unfollow a user (idempotent)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Username"
+      responses:
+        "204":
+          description: Not following
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/posts:
+    post:
+      tags: [Posts]
+      operationId: createPost
+      summary: Create a post or draft
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [content]
+              properties:
+                content: { type: string, maxLength: 500 }
+                image_url: { type: string, format: uri, maxLength: 500 }
+                status: { type: string, enum: [draft, published], default: published }
+      responses:
+        "201":
+          description: Created post
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Post" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    get:
+      tags: [Posts]
+      operationId: listPosts
+      summary: List posts with offset pagination
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/StatusFilter"
+        - $ref: "#/components/parameters/AuthorFilter"
+      responses:
+        "200":
+          description: Page of posts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Post" }
+                  meta: { $ref: "#/components/schemas/OffsetMeta" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/posts/{postID}:
+    get:
+      tags: [Posts]
+      operationId: getPost
+      summary: Get a post
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      responses:
+        "200":
+          description: Post
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Post" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Posts]
+      operationId: updatePost
+      summary: Update or publish an own post
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                content: { type: string, maxLength: 500 }
+                image_url: { type: [string, "null"], maxLength: 500 }
+                status: { type: string, enum: [draft, published] }
+      responses:
+        "200":
+          description: Updated post
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Post" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Posts]
+      operationId: deletePost
+      summary: Delete an own post
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      responses:
+        "204":
+          description: Deleted
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/posts/{postID}/comments:
+    post:
+      tags: [Comments]
+      operationId: createComment
+      summary: Comment on a post
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [content]
+              properties:
+                content: { type: string, maxLength: 1000 }
+      responses:
+        "201":
+          description: Created comment
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Comment" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    get:
+      tags: [Comments]
+      operationId: listComments
+      summary: List comments on a post
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Page of comments
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Comment" }
+                  meta: { $ref: "#/components/schemas/OffsetMeta" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/comments/{commentID}:
+    patch:
+      tags: [Comments]
+      operationId: updateComment
+      summary: Edit an own comment
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/CommentID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [content]
+              properties:
+                content: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: Updated comment
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/Comment" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Comments]
+      operationId: deleteComment
+      summary: Delete a comment (author or post author)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/CommentID"
+      responses:
+        "204":
+          description: Deleted
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/posts/{postID}/reaction:
+    put:
+      tags: [Reactions]
+      operationId: setReaction
+      summary: Create or replace a reaction
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [type]
+              properties:
+                type: { type: string, enum: [like, love, laugh] }
+      responses:
+        "200":
+          description: Updated summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/ReactionSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Reactions]
+      operationId: removeReaction
+      summary: Remove a reaction (idempotent)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      responses:
+        "204":
+          description: Removed
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/posts/{postID}/reactions:
+    get:
+      tags: [Reactions]
+      operationId: listReactions
+      summary: List reactions on a post
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - name: type
+          in: query
+          schema: { type: string, enum: [like, love, laugh] }
+      responses:
+        "200":
+          description: Page of reactions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Reaction" }
+                  meta: { $ref: "#/components/schemas/OffsetMeta" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/posts/{postID}/reaction-summary:
+    get:
+      tags: [Reactions]
+      operationId: getReactionSummary
+      summary: Reaction counts and viewer reaction
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/ReactionSummary" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/feed:
+    get:
+      tags: [Discovery]
+      operationId: getFeed
+      summary: Posts from followed users plus own posts
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Cursor page of posts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Post" }
+                  meta: { $ref: "#/components/schemas/CursorMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/explore:
+    get:
+      tags: [Discovery]
+      operationId: getExplore
+      summary: Public posts, newest first
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Cursor page of published posts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Post" }
+                  meta: { $ref: "#/components/schemas/CursorMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/search/users:
+    get:
+      tags: [Discovery]
+      operationId: searchUsers
+      summary: Search users by username or display name
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Query"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Page of users
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/User" }
+                  meta: { $ref: "#/components/schemas/OffsetMeta" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/search/posts:
+    get:
+      tags: [Discovery]
+      operationId: searchPosts
+      summary: Full-text search over published posts
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/Query"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Page of posts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Post" }
+                  meta: { $ref: "#/components/schemas/OffsetMeta" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/notifications:
+    get:
+      tags: [Notifications]
+      operationId: listNotifications
+      summary: List notifications
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - name: unread
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Page of notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Notification" }
+                  meta: { $ref: "#/components/schemas/OffsetMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/notifications/unread-count:
+    get:
+      tags: [Notifications]
+      operationId: unreadCount
+      summary: Unread notification count
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [unread]
+                    properties:
+                      unread: { type: integer, minimum: 0 }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/v1/notifications/{notificationID}/read:
+    patch:
+      tags: [Notifications]
+      operationId: markNotificationRead
+      summary: Mark one notification read
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/NotificationID"
+      responses:
+        "204":
+          description: Marked read
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/notifications/read-all:
+    post:
+      tags: [Notifications]
+      operationId: markAllNotificationsRead
+      summary: Mark all notifications read
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Number updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [updated]
+                    properties:
+                      updated: { type: integer, minimum: 0 }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Username:
+      name: username
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[a-z0-9_]+$" }
+    PostID:
+      name: postID
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    CommentID:
+      name: commentID
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    NotificationID:
+      name: notificationID
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Limit:
+      name: limit
+      in: query
+      description: Page size (1-100).
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor from `meta.next_cursor`.
+      schema: { type: string }
+    Query:
+      name: q
+      in: query
+      required: true
+      schema: { type: string, minLength: 2, maxLength: 100 }
+    StatusFilter:
+      name: status
+      in: query
+      schema: { type: string, enum: [draft, published] }
+    AuthorFilter:
+      name: author
+      in: query
+      schema: { type: string }
+
+  schemas:
+    UserSummary:
+      type: object
+      required: [id, username, display_name]
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        display_name: { type: string }
+        avatar_url: { type: [string, "null"] }
+
+    User:
+      type: object
+      required: [id, username, display_name, bio, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        display_name: { type: string }
+        bio: { type: string }
+        avatar_url: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+
+    PrivateUser:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          required: [email]
+          properties:
+            email: { type: string, format: email }
+
+    Profile:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          required: [stats]
+          properties:
+            stats:
+              type: object
+              required: [posts, followers, following]
+              properties:
+                posts: { type: integer }
+                followers: { type: integer }
+                following: { type: integer }
+
+    Session:
+      type: object
+      required: [user, token_type, access_token, refresh_token, expires_in, refresh_expires_at]
+      properties:
+        user: { $ref: "#/components/schemas/PrivateUser" }
+        token_type: { type: string, const: Bearer }
+        access_token: { type: string }
+        refresh_token:
+          type: string
+          description: Opaque `rt_` token. Store it securely; it is not a JWT.
+        expires_in:
+          type: integer
+          description: Access token lifetime in seconds.
+        refresh_expires_at: { type: string, format: date-time }
+
+    Post:
+      type: object
+      required: [id, content, status, author, comment_count, reaction_count, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        content: { type: string }
+        image_url: { type: [string, "null"] }
+        status: { type: string, enum: [draft, published] }
+        author: { $ref: "#/components/schemas/UserSummary" }
+        comment_count: { type: integer }
+        reaction_count: { type: integer }
+        viewer_reaction:
+          type: [string, "null"]
+          enum: [like, love, laugh, null]
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        published_at: { type: [string, "null"], format: date-time }
+
+    Comment:
+      type: object
+      required: [id, post_id, content, author, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        post_id: { type: string, format: uuid }
+        content: { type: string }
+        author: { $ref: "#/components/schemas/UserSummary" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Reaction:
+      type: object
+      required: [post_id, type, user, created_at, updated_at]
+      properties:
+        post_id: { type: string, format: uuid }
+        type: { type: string, enum: [like, love, laugh] }
+        user: { $ref: "#/components/schemas/UserSummary" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ReactionSummary:
+      type: object
+      required: [total, counts, viewer_reaction]
+      properties:
+        total: { type: integer }
+        counts:
+          type: object
+          properties:
+            like: { type: integer }
+            love: { type: integer }
+            laugh: { type: integer }
+        viewer_reaction: { type: [string, "null"], enum: [like, love, laugh, null] }
+
+    Notification:
+      type: object
+      required: [id, type, actor, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [follow, comment, reaction] }
+        actor: { $ref: "#/components/schemas/UserSummary" }
+        post_id: { type: [string, "null"], format: uuid }
+        comment_id: { type: [string, "null"], format: uuid }
+        read_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+
+    OffsetMeta:
+      type: object
+      required: [limit, offset, has_more, next_offset]
+      properties:
+        limit: { type: integer }
+        offset: { type: integer }
+        has_more: { type: boolean }
+        next_offset: { type: [integer, "null"] }
+
+    CursorMeta:
+      type: object
+      required: [limit, next_cursor]
+      properties:
+        limit: { type: integer }
+        next_cursor: { type: [string, "null"] }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - bad_request
+                - validation_error
+                - unauthorized
+                - forbidden
+                - not_found
+                - method_not_allowed
+                - conflict
+                - payload_too_large
+                - rate_limited
+                - request_timeout
+                - internal_error
+            message: { type: string }
+            details:
+              type: [array, "null"]
+              items:
+                type: object
+                properties:
+                  field: { type: string }
+                  message: { type: string }
+            request_id: { type: string }
+
+  responses:
+    BadRequest:
+      description: Malformed request
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ValidationError:
+      description: Field validation failed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Authenticated but not allowed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Resource not found (or hidden draft)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Unique constraint violated
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    PayloadTooLarge:
+      description: Request body exceeds the configured limit
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RateLimited:
+      description: Too many requests
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ServiceUnavailable:
+      description: Dependency not ready
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

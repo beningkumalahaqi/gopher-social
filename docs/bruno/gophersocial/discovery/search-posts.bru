@@ -1,0 +1,11 @@
+meta {
+  name: Search Posts
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/search/posts?q=golang&limit=20
+  body: none
+  auth: none
+}

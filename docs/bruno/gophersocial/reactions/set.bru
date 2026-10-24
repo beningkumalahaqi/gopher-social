@@ -1,0 +1,21 @@
+meta {
+  name: Set Reaction
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/api/v1/posts/{{postId}}/reaction
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "type": "love"
+  }
+}

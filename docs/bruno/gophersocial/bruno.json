@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "name": "GopherSocial",
+  "type": "collection",
+  "ignore": ["node_modules", ".git"]
+}

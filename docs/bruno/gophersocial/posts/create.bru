@@ -1,0 +1,26 @@
+meta {
+  name: Create Post
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/posts
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "content": "Hello from Bruno",
+    "status": "published"
+  }
+}
+
+script:post-response {
+  bru.setVar("postId", res.body.data.id);
+}

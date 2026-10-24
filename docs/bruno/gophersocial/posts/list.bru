@@ -1,0 +1,11 @@
+meta {
+  name: List Posts
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/posts?limit=20&offset=0&status=published
+  body: none
+  auth: none
+}
