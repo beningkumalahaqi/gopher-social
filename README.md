@@ -299,4 +299,4 @@ The ordered map and study paths are in
 
 ## License
 
-MIT. Use it, fork it, teach with it.
+Released under the [MIT License](LICENSE). Use it, fork it, teach with it.
